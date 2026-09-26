@@ -393,8 +393,10 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
+  playerCam: {fileID: 158166406228773064}
   AIController: {fileID: 5925441863866825032}
   playerController: {fileID: 871520129997148454}
+  playerControlled: 0
   inTabletopGameplay: 1
   inDungeonGameplay: 0
 --- !u!1 &7999239363143198886

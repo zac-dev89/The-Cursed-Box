@@ -1,5 +1,7 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Mirror;
+
 
 public class CustomNetworkManager : NetworkManager
 {
@@ -7,14 +9,19 @@ public class CustomNetworkManager : NetworkManager
     public GameObject gamePlayer;
 
 
-
-
     public override void OnServerChangeScene(string newSceneName)
     {
+        if (newSceneName == "Gameplay")
+        {
+            playerPrefab = gamePlayer;
+            onlineScene = newSceneName;
+        }
+        else
+        {
+            onlineScene = null;
+        }
+
         base.OnServerChangeScene(newSceneName);
-
-        playerPrefab = gamePlayer;
-
     }
 
 
@@ -31,34 +38,33 @@ public class CustomNetworkManager : NetworkManager
 
         // Set Up Player Game State
         PlayerGameState playerGameState = player.GetComponent<PlayerGameState>();
+
         playerGameState.ServerSwitchToPlayerController();
+        playerGameState.UpdateCameraSetUp();
 
         NetworkServer.AddPlayerForConnection(conn, player);
+
+        GameManager.Instance.players.Add(conn.identity);
     }
 
     public override void OnServerDisconnect(NetworkConnectionToClient conn)
     {
-        //Debug.Log("Detect client leave");
 
-        if (conn == null) return;
-        //Debug.Log("Conn is valid");
+        if (conn.identity == null) return;
 
-        GameManager gameManager = GetGameManager();
-        if (gameManager == null) return;
-        //Debug.Log("GameManager is valid");
+        if (GameManager.Instance == null) return;
 
-        TabletopSpawning tabletopSpawning = GetTabletopSpawning();
-        if (tabletopSpawning == null) return;
-        //Debug.Log("TabletopSpawning is valid");
+        if (TabletopSpawning.Instance == null) return;
 
         PlayerGameState targetPlayerGameState = conn.identity.GetComponent<PlayerGameState>();
         if (targetPlayerGameState == null) return;
-        //Debug.Log("PlayerGameState is valid");
 
-        if (!gameManager.hasGameStarted)
+        GameManager.Instance.players.Remove(conn.identity);
+
+        if (!GameManager.Instance.hasGameStarted)
         {
             //Debug.Log("Clear Spawn");
-            tabletopSpawning.ServerRemovePlayerFromSpawn();
+            TabletopSpawning.Instance.ServerRemovePlayerFromSpawn();
             NetworkServer.DestroyPlayerForConnection(conn);
         }
         else
@@ -70,16 +76,19 @@ public class CustomNetworkManager : NetworkManager
                 NetworkServer.RemovePlayerForConnection(conn);
             }
         }
+        
+        
     }
 
-    private GameManager GetGameManager()
+    public override void OnClientDisconnect()
     {
-        return FindAnyObjectByType<GameManager>();
+        base.OnClientDisconnect();
+
+        GameTypeManager.Instance.ExitMatch();
+        SceneManager.LoadScene("MainMenu");
+
     }
 
-    private TabletopSpawning GetTabletopSpawning()
-    {
-        return FindAnyObjectByType<TabletopSpawning>();
-    }
+
 
 }

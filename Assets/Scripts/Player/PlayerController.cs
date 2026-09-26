@@ -12,11 +12,7 @@ public class PlayerController : NetworkBehaviour
     [Header("Enabling Gameplay")]
     [SyncVar] public bool playerControllerEnabled;
 
-    private void Start()
-    {
-        camera.gameObject.SetActive(isLocalPlayer);
 
-    }
 
     private void Update()
     {
