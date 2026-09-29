@@ -1,8 +1,9 @@
+using Mirror;
 using UnityEngine;
 
-public class GameTypeManager : MonoBehaviour
+public class GameController : MonoBehaviour
 {
-    public static GameTypeManager Instance;
+    public static GameController Instance;
 
     public bool isSingleplayerGame;
     public bool isMultiplayerGame;
@@ -29,9 +30,25 @@ public class GameTypeManager : MonoBehaviour
         isMultiplayerGame = true;
     }
 
-    public void ExitMatch()
+    public void ResetGameTypes()
     {
         isSingleplayerGame = false;
         isMultiplayerGame = false;
+    }
+
+    public void ExitMatch()
+    {
+        ResetGameTypes();
+
+        if (NetworkServer.active)
+        {
+            NetworkManager.singleton.StopHost();
+        }
+        else if (NetworkClient.active)
+        {
+            NetworkManager.singleton.StopClient();
+        }
+
+        if (SteamLobby.Instance != null) SteamLobby.Instance.LeaveSteamLobby();
     }
 }

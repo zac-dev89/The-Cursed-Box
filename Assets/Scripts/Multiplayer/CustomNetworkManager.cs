@@ -6,16 +6,24 @@ using Mirror;
 public class CustomNetworkManager : NetworkManager
 {
     [Header("Player Types")]
+    public GameObject lobbyPlayer;
     public GameObject gamePlayer;
+
 
 
     public override void OnServerChangeScene(string newSceneName)
     {
-        if (newSceneName == "Gameplay")
+        if (newSceneName == "Lobby" || newSceneName == "TestingLobby")
+        {
+            playerPrefab = lobbyPlayer;
+            onlineScene = newSceneName;
+        }
+        else if (newSceneName == "Gameplay")
         {
             playerPrefab = gamePlayer;
             onlineScene = newSceneName;
         }
+        
         else
         {
             onlineScene = null;
@@ -27,28 +35,33 @@ public class CustomNetworkManager : NetworkManager
 
     public override void OnServerAddPlayer(NetworkConnectionToClient conn)
     {
-        TabletopSpawning tabletopSpawning = FindAnyObjectByType<TabletopSpawning>();
+        if (SceneManager.GetActiveScene().name == "Gameplay")
+        {
+            TabletopSpawning tabletopSpawning = FindAnyObjectByType<TabletopSpawning>();
 
-        Transform startPos = tabletopSpawning.ServerAddPlayerFromSpawn();
-        GameObject player = startPos != null
-            ? Instantiate(playerPrefab, startPos.position, startPos.rotation)
-            : Instantiate(playerPrefab);
+            Transform startPos = tabletopSpawning.ServerAddPlayerFromSpawn();
+            GameObject player = startPos != null
+                ? Instantiate(playerPrefab, startPos.position, startPos.rotation)
+                : Instantiate(playerPrefab);
 
-        player.name = $"{playerPrefab.name} [connId={conn.connectionId}]";
+            player.name = $"{playerPrefab.name} [connId={conn.connectionId}]";
 
-        // Set Up Player Game State
-        PlayerGameState playerGameState = player.GetComponent<PlayerGameState>();
+            // Set Up Player Game State
+            PlayerGameState playerGameState = player.GetComponent<PlayerGameState>();
 
-        playerGameState.ServerSwitchToPlayerController();
-        playerGameState.UpdateCameraSetUp();
+            playerGameState.ServerSwitchToPlayerController();
+            NetworkServer.AddPlayerForConnection(conn, player);
+        }
+        else if (SceneManager.GetActiveScene().name == "Lobby" || SceneManager.GetActiveScene().name == "TestingLobby")
+        {
+            base.OnServerAddPlayer(conn);
+        }
 
-        NetworkServer.AddPlayerForConnection(conn, player);
-
-        GameManager.Instance.players.Add(conn.identity);
     }
 
     public override void OnServerDisconnect(NetworkConnectionToClient conn)
     {
+        if (conn == null) return;
 
         if (conn.identity == null) return;
 
@@ -58,8 +71,6 @@ public class CustomNetworkManager : NetworkManager
 
         PlayerGameState targetPlayerGameState = conn.identity.GetComponent<PlayerGameState>();
         if (targetPlayerGameState == null) return;
-
-        GameManager.Instance.players.Remove(conn.identity);
 
         if (!GameManager.Instance.hasGameStarted)
         {
@@ -84,7 +95,9 @@ public class CustomNetworkManager : NetworkManager
     {
         base.OnClientDisconnect();
 
-        GameTypeManager.Instance.ExitMatch();
+        onlineScene = null;
+        if (SteamLobby.Instance != null) SteamLobby.Instance.LeaveSteamLobby();
+        GameController.Instance.ResetGameTypes();
         SceneManager.LoadScene("MainMenu");
 
     }

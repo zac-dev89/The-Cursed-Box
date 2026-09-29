@@ -1,49 +1,67 @@
 using UnityEngine;
 using Mirror;
+using Unity.VisualScripting;
 
 public class PlayerGameState : NetworkBehaviour
 {
-    [Header("Camera References")]
+    [Header("Main References")]
     public GameObject playerCam;
-
-    [Header("Controller References")]
     public AIController AIController;
     public PlayerController playerController;
+    public GameplayUIHandler gameplayUIHandler;
+
 
     [Header("Player Type States")]
-    private bool AIControlled;
+    public bool AIControlled;
     public bool playerControlled;
 
     [Header("Game States")]
     public bool inTabletopGameplay;
     public bool inDungeonGameplay;
 
+    [Header("Lobby")]
+    [SyncVar(hook = nameof(OnReady))] public bool isReady;
+
+    [Header("Debug Testing")]
+    public Material botMaterial;
+    public MeshRenderer botMeshRenderer;
+
+    private void Start()
+    {
+        if (!isLocalPlayer)
+        {
+            InitializeOtherPlayer();
+        }
+    }
+
+    public override void OnStartLocalPlayer()
+    {
+        InitializeYourPlayer();
+    }
 
     #region Initializing Player
-    public void UpdateCameraSetUp()
+    public void InitializeYourPlayer()
     {
-        if (AIControlled)
-        {
-            playerCam.SetActive(false);
-            return;
-        }
+        gameplayUIHandler.EnableUI();
 
         if (GameManager.Instance.hasGameStarted)
         {
             playerCam.SetActive(true);
-            GameManager.Instance.lobbyCam.SetActive(false);
+            gameplayUIHandler.ToggleTabletopPanel();
         }
-        else
-        {
-            playerCam.SetActive(false);
-            GameManager.Instance.lobbyCam.SetActive(true);
-        }
+    }
+
+    public void InitializeOtherPlayer()
+    {
+        gameplayUIHandler.DisableUI();
+        playerCam.SetActive(false);
     }
 
 
     #endregion
 
 
+    #region Switch Controllers
     [Server]
     public void ServerSwitchToAIController()
     {
@@ -52,7 +70,15 @@ public class PlayerGameState : NetworkBehaviour
 
         playerController.playerControllerEnabled = false;
         AIController.AIControllerEnabled = true;
+
+        RpcSwitchAIController();
     }
+    [ClientRpc]
+    private void RpcSwitchAIController()
+    {
+        botMeshRenderer.material = botMaterial;
+    }
+
 
     [Server]
     public void ServerSwitchToPlayerController()
@@ -62,5 +88,17 @@ public class PlayerGameState : NetworkBehaviour
 
         playerController.playerControllerEnabled = true;
         AIController.AIControllerEnabled = false;
+    }
+    #endregion
+
+    [Command]
+    public void CmdChangeReadyStatus()
+    {
+        isReady = !isReady;
+    }
+
+    private void OnReady(bool oldValue, bool newValue)
+    {
+
     }
 }

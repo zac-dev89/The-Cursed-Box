@@ -17,12 +17,12 @@ public class MainMenu : MonoBehaviour
         NetworkManager.singleton.maxConnections = 1;
         NetworkManager.singleton.StartHost();
         NetworkManager.singleton.ServerChangeScene("Gameplay");
-        GameTypeManager.Instance.InitiateSingleplayerGame();
+        GameController.Instance.InitiateSingleplayerGame();
     }
 
     public void StartMultiplayerGame()
     {
-        GameTypeManager.Instance.InitiateMultiplayerGame();
+        GameController.Instance.InitiateMultiplayerGame();
         SteamLobby.Instance.HostLobby();
     }
 

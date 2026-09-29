@@ -69,7 +69,7 @@ public class SteamLobby : MonoBehaviour
 
         lobbyID = callback.m_ulSteamIDLobby;
 
-        networkManager.ServerChangeScene("Gameplay");
+        networkManager.ServerChangeScene("Lobby");
     }
     void OnGameLobbyJoinRequested(GameLobbyJoinRequested_t callback)
     {
@@ -92,7 +92,7 @@ public class SteamLobby : MonoBehaviour
             return;
         }
 
-        GameTypeManager.Instance.InitiateMultiplayerGame();
+        GameController.Instance.InitiateMultiplayerGame();
 
         lobbyID = callback.m_ulSteamIDLobby;
         string _hostAddress = SteamMatchmaking.GetLobbyData(new CSteamID(callback.m_ulSteamIDLobby), HostAddressKey);

@@ -8,15 +8,10 @@ public class GameManager : NetworkBehaviour
     public static GameManager Instance;
 
     [Header("Main References")]
-    public GameObject lobbyCam;
     public GameObject botPlayerPrefab;
 
     [Header("Game States")]
     [SyncVar] public bool hasGameStarted = false;
-
-    [Header("Players")]
-    public List<NetworkIdentity> players = new List<NetworkIdentity>();
-
 
     private void Awake()
     {
@@ -27,27 +22,35 @@ public class GameManager : NetworkBehaviour
 
         if (!NetworkServer.active) return;
 
-        if (GameTypeManager.Instance.isSingleplayerGame)
-        {
-            SetUpSingleplayerGame();
-        }
-        else if (GameTypeManager.Instance.isMultiplayerGame)
-        {
-            SetUpMultiplayerGame();
-        }
+        hasGameStarted = false;
     }
 
+
     #region Set Up Games
-    public void SetUpSingleplayerGame()
+
+    [Server]
+    public void ServerStartSingleplayerGame()
     {
         hasGameStarted = true;
 
         // Spawn Bots
-        SpawnSingleplayerAI();
+        ServerSpawnBots(3);
     }
-    private void SpawnSingleplayerAI()
+
+
+    [Server]
+    public void ServerStartMultiplayerGame()
     {
-        for (int i = 0; i < 3; i++)
+        hasGameStarted = true;
+
+        int numBots = 4 - PlayerManager.Instance.players.Count;
+        ServerSpawnBots(numBots);
+    }
+
+    [Server]
+    private void ServerSpawnBots(int num)
+    {
+        for (int i = 0; i < num; i++)
         {
             Transform seatSpawn = TabletopSpawning.Instance.ServerAddPlayerFromSpawn();
             GameObject bot = Instantiate(botPlayerPrefab, seatSpawn.position, seatSpawn.rotation);
@@ -55,17 +58,11 @@ public class GameManager : NetworkBehaviour
 
             PlayerGameState botGameState = bot.GetComponent<PlayerGameState>();
             botGameState.ServerSwitchToAIController();
-            botGameState.UpdateCameraSetUp();
 
         }
     }
-
-
-
-    public void SetUpMultiplayerGame()
-    {
-        hasGameStarted = false;
-    }
     #endregion
+
+
 
 }

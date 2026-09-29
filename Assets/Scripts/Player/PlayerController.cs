@@ -8,6 +8,8 @@ public class PlayerController : NetworkBehaviour
     public PlayerGameState playerGameState;
     public Transform FPSCamera;
     public Camera camera;
+    public GameplayUIHandler gameplayUIHandler;
+
 
     [Header("Enabling Gameplay")]
     [SyncVar] public bool playerControllerEnabled;
