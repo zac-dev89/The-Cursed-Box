@@ -54,7 +54,6 @@ public class PlayerManager : NetworkBehaviour
         }
 
         allPlayersReady = true;
-        Debug.Log("Everyone Ready, Start Game");
         ServerReadyToStartGame();
     }
 

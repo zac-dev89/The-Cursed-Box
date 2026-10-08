@@ -12,6 +12,7 @@ public class GameplayUIHandler : NetworkBehaviour
     public PlayerGameState playerGameState;
 
     [Header("Gameplay Panels")]
+    public GameObject waitingPanel;
     public GameObject tabletopPanel;
     public GameObject dungeonPanel;
 
@@ -32,7 +33,10 @@ public class GameplayUIHandler : NetworkBehaviour
     }
 
     #region Toggle Panels
-
+    public void ToggleWaitingPanel()
+    {
+        TogglePanel(waitingPanel);
+    }
     public void ToggleTabletopPanel()
     {
         TogglePanel(tabletopPanel);

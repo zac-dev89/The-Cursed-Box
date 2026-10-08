@@ -1,6 +1,27 @@
-using UnityEngine;
 using Mirror;
-using Unity.VisualScripting;
+using UnityEngine;
+
+
+public enum PlayerType
+{
+    NONE,
+    PlayerControlled,
+    AIControlled
+}
+public enum PlayerState
+{
+    NONE,
+    Tabletop,
+    DungeonHunter,
+    DungeonVictim
+}
+public enum PlayerTabletopState
+{
+    NONE,
+    Itembox,
+    Cursedbox
+}
+
 
 public class PlayerGameState : NetworkBehaviour
 {
@@ -12,15 +33,17 @@ public class PlayerGameState : NetworkBehaviour
 
 
     [Header("Player Type States")]
-    public bool AIControlled;
-    public bool playerControlled;
+    [SyncVar] public PlayerType playerType;
+
+    [Space]
+
+    [SyncVar] public bool playerStartedInGame;
+
 
     [Header("Game States")]
-    public bool inTabletopGameplay;
-    public bool inDungeonGameplay;
+    public PlayerState playerState;
+    [SyncVar] public bool playerInTurn;
 
-    [Header("Lobby")]
-    [SyncVar(hook = nameof(OnReady))] public bool isReady;
 
     [Header("Debug Testing")]
     public Material botMaterial;
@@ -43,12 +66,13 @@ public class PlayerGameState : NetworkBehaviour
     public void InitializeYourPlayer()
     {
         gameplayUIHandler.EnableUI();
+        playerCam.SetActive(true);
 
-        if (GameManager.Instance.hasGameStarted)
-        {
-            playerCam.SetActive(true);
-            gameplayUIHandler.ToggleTabletopPanel();
-        }
+        // Local enabling
+        playerType = PlayerType.PlayerControlled;
+
+        playerController.playerControllerEnabled = true;
+        AIController.AIControllerEnabled = false;
     }
 
     public void InitializeOtherPlayer()
@@ -60,13 +84,11 @@ public class PlayerGameState : NetworkBehaviour
 
     #endregion
 
-
     #region Switch Controllers
     [Server]
     public void ServerSwitchToAIController()
     {
-        AIControlled = true;
-        playerControlled = false;
+        playerType = PlayerType.AIControlled;
 
         playerController.playerControllerEnabled = false;
         AIController.AIControllerEnabled = true;
@@ -83,22 +105,111 @@ public class PlayerGameState : NetworkBehaviour
     [Server]
     public void ServerSwitchToPlayerController()
     {
-        playerControlled = true;
-        AIControlled = false;
+        playerType = PlayerType.PlayerControlled;
 
         playerController.playerControllerEnabled = true;
         AIController.AIControllerEnabled = false;
     }
+
     #endregion
 
+    #region PlayerStartedGame
+    [Server]
+    public void ServerOnPlayerGameStarted()
+    {
+        playerStartedInGame = true;
+
+        playerState = PlayerState.Tabletop;
+
+        RpcOnPlayerGameStarted();
+    }
+    [ClientRpc]
+    private void RpcOnPlayerGameStarted()
+    {
+        playerStartedInGame = true;
+        playerState = PlayerState.Tabletop;
+
+        if (isLocalPlayer && playerType == PlayerType.PlayerControlled)
+        {
+            playerController.OnPlayerControllerStarted();
+        }
+    }
+    #endregion
+
+    #region Player Turn Management
+    [Server]
+    public void ServerEndPlayerTurn()
+    {
+        playerInTurn = false;
+        playerTabletopState = PlayerTabletopState.NONE;
+    }
+
+    [Server]
+    public void ServerStartPlayerTurn()
+    {
+        playerInTurn = true;
+        playerTabletopState = PlayerTabletopState.Itembox;
+    }
+
+    #endregion
+
+
+
+    #region Tabletop Gameplay
+    [Header("Player Tabletop Gameplay")]
+    [SyncVar(hook = nameof(OnTabletopStateChanged))] public PlayerTabletopState playerTabletopState;
+
+    [SyncVar] public int usedSpecialItemsCount;
+
+
     [Command]
-    public void CmdChangeReadyStatus()
+    public void CmdFinishedWithItemBox()
     {
-        isReady = !isReady;
+        playerTabletopState = PlayerTabletopState.Cursedbox;
     }
 
-    private void OnReady(bool oldValue, bool newValue)
+
+    private void OnTabletopStateChanged(PlayerTabletopState oldValue, PlayerTabletopState newValue)
     {
+        Transform interactableFocusPT = null;
+        switch (newValue)
+        {
+            case PlayerTabletopState.Itembox:
+                interactableFocusPT = GameManager.Instance.cursedBoxStation.itemBox.transform;
+                break;
+            case PlayerTabletopState.Cursedbox:
+                interactableFocusPT = GameManager.Instance.cursedBoxStation.cursedBox.transform;
+                break;
+            default:
+                interactableFocusPT = null;
+                break;
+        }
+
+        if (playerType == PlayerType.PlayerControlled)
+        {
+            if (interactableFocusPT != null)
+            {
+                playerController.FocusOnInteractable(interactableFocusPT, 50f, .2f);
+            }
+            else
+            {
+                playerController.ExitFocusOnInteractable();
+            }
+        }
+
 
     }
+
+    // Special item gambling
+
+
+    // Cursed Box
+
+    #endregion
+
+    #region Dungeon Gameplay
+
+
+
+    #endregion
 }

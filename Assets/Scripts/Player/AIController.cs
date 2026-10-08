@@ -14,13 +14,17 @@ public class AIController : NetworkBehaviour
         if (!NetworkServer.active) return;
         if (!AIControllerEnabled) return;
 
-        if (playerGameState.inTabletopGameplay)
+        if (playerGameState.playerState == PlayerState.Tabletop)
         {
             TabletopGameplay();
         }
-        else if (playerGameState.inDungeonGameplay)
+        else if (playerGameState.playerState == PlayerState.DungeonHunter)
         {
-            DungeonGameplay();
+            DungeonHunterGameplay();
+        }
+        else if (playerGameState.playerState == PlayerState.DungeonVictim)
+        {
+            DungeonVictimGameplay();
         }
     }
 
@@ -34,7 +38,11 @@ public class AIController : NetworkBehaviour
 
 
     #region Dungeon Gameplay
-    private void DungeonGameplay()
+    private void DungeonHunterGameplay()
+    {
+
+    }
+    private void DungeonVictimGameplay()
     {
 
     }

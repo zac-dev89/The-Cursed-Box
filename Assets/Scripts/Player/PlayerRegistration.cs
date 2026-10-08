@@ -8,7 +8,6 @@ public class PlayerRegistration : NetworkBehaviour
     private bool sentReady;
     public bool isReady;
 
-    [SyncVar] public string playerName;
 
     public override void OnStartServer()
     {
