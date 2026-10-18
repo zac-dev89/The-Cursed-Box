@@ -1,4 +1,5 @@
 using Mirror;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 
@@ -23,6 +24,23 @@ public enum PlayerTabletopState
 }
 
 
+[System.Serializable]
+public struct PlayerTabletopTurn
+{
+    public bool inTurn;
+    public PlayerTabletopState playerTabletopState;
+
+    public bool inBloodPackMode;
+    public bool inItemCardMode;
+
+    public bool hasGambledForItem;
+    public bool hasUsedBloodPack;
+    public int insertedItems;
+    public bool hasDrawnCursedCard;
+
+}
+
+
 public class PlayerGameState : NetworkBehaviour
 {
     [Header("Main References")]
@@ -42,12 +60,21 @@ public class PlayerGameState : NetworkBehaviour
 
     [Header("Game States")]
     public PlayerState playerState;
-    [SyncVar] public bool playerInTurn;
+    [SyncVar(hook = nameof(OnTabletopTurn))] public PlayerTabletopTurn playerTabletopTurn;
+
+    [Header("Blood Sacrificing")]
+    public int maxBloodSacrifices = 10;
+    [SyncVar(hook = nameof(OnBloodLevelChanged))] public int currentBloodAmount;
+
 
 
     [Header("Debug Testing")]
     public Material botMaterial;
     public MeshRenderer botMeshRenderer;
+
+    [Space]
+
+    public bool debug_GivePlayerAllItems;
 
     private void Start()
     {
@@ -61,6 +88,13 @@ public class PlayerGameState : NetworkBehaviour
     {
         InitializeYourPlayer();
     }
+
+    public override void OnStartClient()
+    {
+        specialItemsList.OnAdd += OnItemAdded;
+        specialItemsList.OnRemove += OnItemRemoved;
+    }
+
 
     #region Initializing Player
     public void InitializeYourPlayer()
@@ -120,6 +154,12 @@ public class PlayerGameState : NetworkBehaviour
         playerStartedInGame = true;
 
         playerState = PlayerState.Tabletop;
+        currentBloodAmount = maxBloodSacrifices;
+
+
+        if (debug_GivePlayerAllItems) DEBUG_ServerGivePlayerAllItems();
+
+
 
         RpcOnPlayerGameStarted();
     }
@@ -140,67 +180,152 @@ public class PlayerGameState : NetworkBehaviour
     [Server]
     public void ServerEndPlayerTurn()
     {
-        playerInTurn = false;
-        playerTabletopState = PlayerTabletopState.NONE;
+        PlayerTabletopTurn temp = new PlayerTabletopTurn();
+        playerTabletopTurn = temp;
     }
 
     [Server]
     public void ServerStartPlayerTurn()
     {
-        playerInTurn = true;
-        playerTabletopState = PlayerTabletopState.Itembox;
+        PlayerTabletopTurn temp = new PlayerTabletopTurn();
+        temp.inTurn = true;
+        temp.playerTabletopState = PlayerTabletopState.Itembox;
+
+        playerTabletopTurn = temp;
     }
 
     #endregion
 
 
-
     #region Tabletop Gameplay
-    [Header("Player Tabletop Gameplay")]
-    [SyncVar(hook = nameof(OnTabletopStateChanged))] public PlayerTabletopState playerTabletopState;
+    [Header("Tabletop Gameplay")]
+    public readonly SyncList<string> specialItemsList = new SyncList<string>();
 
-    [SyncVar] public int usedSpecialItemsCount;
+
+    private void OnTabletopTurn(PlayerTabletopTurn oldValue, PlayerTabletopTurn newValue)
+    {
+        PlayerTabletopTurn tabletopTurn = newValue;
+
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            playerController.OnPlayerTabletopTurn(tabletopTurn);
+        }
+    }
+
+    #region Items
+
+    [Server]
+    private void DEBUG_ServerGivePlayerAllItems()
+    {
+        for (int i = 0; i < GameManager.Instance.cursedBoxStation.allItems.Count; i++)
+        {
+            int randomAmount = Random.Range(1, 3);
+
+            for (int j = 0; j < randomAmount; j++)
+            {
+                ServerRetrievedItem(GameManager.Instance.cursedBoxStation.allItems[i]);
+            }
+        }
+    }
+
+    [Server]
+    public void ServerRetrievedItem(string item)
+    {   
+        specialItemsList.Add(item);
+    }
+    [Server]
+    public void ServerRemoveItem(string item)
+    {
+        specialItemsList.Remove(item);
+    }
+
+
+    // On changed functions
+    void OnItemAdded(int index)
+    {
+        //Debug.Log($"Element added at index {index} {specialItemsList[index]}");
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            gameplayUIHandler.UpdateItemsUI();
+        }
+    }
+    void OnItemRemoved(int index, string oldValue)
+    {
+        //Debug.Log($"Element removed at index {index} {oldValue}");
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            gameplayUIHandler.UpdateItemsUI();
+        }
+    }
+
+
+    // Using and Finding Items
+    public bool InventoryContainsItem(string itemName)
+    {
+        foreach (string curr_item in specialItemsList)
+        {
+            if (curr_item == itemName) return true;
+        }
+        return false;
+    }
+
+    public int GetQuantityOfItem(string itemName)
+    {
+        int quantity = 0;
+
+        foreach (string curr_item in specialItemsList)
+        {
+            if (curr_item == itemName) quantity++;
+        }
+
+        return quantity;
+    }
+
+    #endregion
+
+    #region Item box
+
+    private void OnBloodLevelChanged(int oldValue, int newValue)
+    {
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            gameplayUIHandler.UpdateBloodLevel(newValue);
+        }
+    }
+
+    public void TryAddBloodPack()
+    {
+        Debug.Log("Try Add Blood Pack");
+
+        if (!InventoryContainsItem("BloodPack")) return;
+        if (playerTabletopTurn.hasUsedBloodPack) return;
+
+        Debug.Log("Can Use Blood Pack");
+
+        CmdTryAddBloodPack();
+    }
+
+    [Command]
+    private void CmdTryAddBloodPack()
+    {
+        if (!InventoryContainsItem("BloodPack")) return;
+        if (playerTabletopTurn.hasUsedBloodPack) return;
+
+        GameManager.Instance.cursedBoxStation.ServerAddBloodPack(this.netIdentity);
+    }
 
 
     [Command]
     public void CmdFinishedWithItemBox()
     {
-        playerTabletopState = PlayerTabletopState.Cursedbox;
+        PlayerTabletopTurn temp = new PlayerTabletopTurn();
+        temp.inTurn = true;
+        temp.playerTabletopState = PlayerTabletopState.Cursedbox;
+
+        playerTabletopTurn = temp;
     }
 
-
-    private void OnTabletopStateChanged(PlayerTabletopState oldValue, PlayerTabletopState newValue)
-    {
-        Transform interactableFocusPT = null;
-        switch (newValue)
-        {
-            case PlayerTabletopState.Itembox:
-                interactableFocusPT = GameManager.Instance.cursedBoxStation.itemBox.transform;
-                break;
-            case PlayerTabletopState.Cursedbox:
-                interactableFocusPT = GameManager.Instance.cursedBoxStation.cursedBox.transform;
-                break;
-            default:
-                interactableFocusPT = null;
-                break;
-        }
-
-        if (playerType == PlayerType.PlayerControlled)
-        {
-            if (interactableFocusPT != null)
-            {
-                playerController.FocusOnInteractable(interactableFocusPT, 50f, .2f);
-            }
-            else
-            {
-                playerController.ExitFocusOnInteractable();
-            }
-        }
-
-
-    }
-
-    // Special item gambling
+    #endregion
 
 
     // Cursed Box

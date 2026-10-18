@@ -99,7 +99,7 @@ public class GameManager : NetworkBehaviour
     }
     #endregion
 
-    #region Main Gameplay
+    #region Tabletop Gameplay
     [Server]
     public void ServerStartSwitchPlayerTurn() // Initializes the start of switch player turn
     {
@@ -131,6 +131,33 @@ public class GameManager : NetworkBehaviour
         NetworkIdentity player = PlayerManager.Instance.players[currentPlayerTurn];
         player.GetComponent<PlayerGameState>().ServerStartPlayerTurn();
     }
+
+    #endregion
+
+
+    #region Dungeon Gameplay
+    [Server]
+    public void ServerActivateDungeon(NetworkIdentity dungeonVictim)
+    {
+        for (int i = 0; i < PlayerManager.Instance.players.Count; i++)
+        {
+            NetworkIdentity tempPlayer = PlayerManager.Instance.players[i];
+            PlayerGameState tempPGS = tempPlayer.GetComponent<PlayerGameState>();
+
+            tempPGS.ServerEndPlayerTurn();
+
+            if (tempPlayer == dungeonVictim)
+            {
+                tempPGS.playerState = PlayerState.DungeonVictim;
+            }
+            else
+            {
+                tempPGS.playerState = PlayerState.DungeonHunter;
+            }
+        }
+    }
+
+
 
     #endregion
 

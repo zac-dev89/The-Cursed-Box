@@ -270,6 +270,7 @@ GameObject:
   - component: {fileID: 635586298}
   - component: {fileID: 635586294}
   - component: {fileID: 635586299}
+  - component: {fileID: 635586300}
   m_Layer: 0
   m_Name: SteamNetworkManager
   m_TagString: Untagged
@@ -397,6 +398,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameTypeManager
   isSingleplayerGame: 0
   isMultiplayerGame: 0
+--- !u!114 &635586300
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 635586293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 645c27294411817439525f4150663905, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RegisterSpawnables
+  spawnableItems:
+  - {fileID: 6697757221375349563, guid: 29d4831befca5574dbdac652bb3ad43b, type: 3}
+  - {fileID: 6697757221375349563, guid: 023eab5c46072724195ef5e4655f813d, type: 3}
+  - {fileID: 6697757221375349563, guid: b70d88bf912df524aa225eb87f4881bd, type: 3}
+  - {fileID: 6697757221375349563, guid: 75034409db0f02a4288d0c03bcfb820e, type: 3}
+  - {fileID: 6697757221375349563, guid: b63a445520fdad04e86b284c50ffe8b0, type: 3}
+  - {fileID: 6697757221375349563, guid: b59daa87648641d45bf62d6e38c9860d, type: 3}
+  - {fileID: 6697757221375349563, guid: 86ed20abb08d81441a8817ba6f6f9884, type: 3}
+  - {fileID: 6697757221375349563, guid: 5492f347f1a5f53408fb4164c012dc1d, type: 3}
+  - {fileID: 6697757221375349563, guid: 9664783c2e44a274e9d175a42253f12a, type: 3}
+  - {fileID: 6697757221375349563, guid: 4221261ba42f0904a8d073f0868e2a6c, type: 3}
 --- !u!1 &918379267
 GameObject:
   m_ObjectHideFlags: 0
