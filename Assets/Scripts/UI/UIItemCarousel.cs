@@ -1,60 +1,99 @@
-using UnityEngine;
+using Mirror;
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.UI;
-using Mirror;
 
 
 public class UIItemCarousel : NetworkBehaviour
 {
-    [Header("References")]
-    [SerializeField] private RectTransform viewport;
-    [SerializeField] private RectTransform content;
+    [Header("Main References")]
+    public PlayerGameState PGS;
+
+    [Header("Cursed Box UI Carousel")]
+    [Space]
+    public RectTransform CB_Viewport;
+    public RectTransform CB_Content;
+    private Coroutine CB_ScrollCoroutine;
+    public int CB_SelectedIndex;
+    public int CB_ItemCount;
+
+    [Header("Item Box UI Carousel")]
+    [Space]
+    public RectTransform IB_Viewport;
+    public RectTransform IB_Content;
+    private Coroutine IB_ScrollCoroutine;
+    public int IB_SelectedIndex;
+    public int IB_ItemCount;
+
 
     [Header("Settings")]
     [SerializeField] private float scrollDuration = 0.25f;
     public float itemWidth = 300f;
     public float itemSpacing = 10f;
 
-    private int selectedIndex = 0;
-    private Coroutine scrollCoroutine;
-    private int ItemCount;
-
 
 
     private void Start()
     {
         if (!isLocalPlayer) return;
-        InitializeItemCarousel();
+        InitializeCarousel(ref IB_Content, ref IB_ItemCount, ref IB_SelectedIndex, ref IB_ScrollCoroutine);
+        InitializeCarousel(ref CB_Content, ref CB_ItemCount, ref CB_SelectedIndex, ref CB_ScrollCoroutine);
     }
 
     private void Update()
     {
         if (!isLocalPlayer) return;
-
-        if (Input.GetKeyDown(KeyCode.A))
-            SelectItem(selectedIndex - 1);
-
-        if (Input.GetKeyDown(KeyCode.D))
-            SelectItem(selectedIndex + 1);
-    }
-
-    public void InitializeItemCarousel()
-    {
-        ItemCount = content.childCount;
-
-        if (ItemCount == 0) return;
-
-        for (int i = 0; i < content.childCount; i++)
+        
+        // Item Box Carousel
+        if (PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox && PGS.playerTabletopTurn.inItemBoxInsertMode)
         {
-            Debug.Log($"{i}: {content.GetChild(i).name}");
+            if (Input.GetKeyDown(Controls.selectLeftItem))
+            {
+                SelectItem(IB_SelectedIndex - 1, ref IB_Content, ref IB_ItemCount, ref IB_SelectedIndex, ref IB_ScrollCoroutine);
+            }
+            else if (Input.GetKeyDown(Controls.selectRightItem))
+            {
+                SelectItem(IB_SelectedIndex + 1, ref IB_Content, ref IB_ItemCount, ref IB_SelectedIndex, ref IB_ScrollCoroutine);
+            }
         }
 
-        selectedIndex = -1;
-        SelectItem(0);
+        // Cursed Box Carousel
+        else if (PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox && PGS.playerTabletopTurn.inCursedBoxInsertMode)
+        {
+            if (Input.GetKeyDown(Controls.selectLeftItem))
+            {
+                SelectItem(CB_SelectedIndex - 1, ref CB_Content, ref CB_ItemCount, ref CB_SelectedIndex, ref IB_ScrollCoroutine);
+            }
+            else if (Input.GetKeyDown(Controls.selectRightItem))
+            {
+                SelectItem(CB_SelectedIndex + 1, ref CB_Content, ref CB_ItemCount, ref CB_SelectedIndex, ref IB_ScrollCoroutine);
+            }
+        }
     }
 
-    public void UpdateItemCarousel(List<string> items)
+    public void UpdateCursedBoxUI(List<string> items)
+    {
+        UpdateItemCarousel(items, ref CB_Content, ref CB_ItemCount, ref CB_SelectedIndex, ref CB_ScrollCoroutine);
+    }
+    public void UpdateItemBoxUI(List<string> items)
+    {
+        UpdateItemCarousel(items, ref IB_Content, ref IB_ItemCount, ref IB_SelectedIndex, ref IB_ScrollCoroutine);
+    }
+
+
+
+    public void InitializeCarousel(ref RectTransform carouselContent, ref int itemCount, ref int selectedIndex, ref Coroutine scrollCoroutine)
+    {
+        itemCount = carouselContent.childCount;
+
+        if (itemCount == 0) return;
+
+        SelectItem(0, ref carouselContent, ref itemCount, ref selectedIndex, ref scrollCoroutine);
+    }
+
+    private void UpdateItemCarousel(List<string> items, ref RectTransform carouselContent, ref int itemCount, ref int selectedIndex, ref Coroutine scrollCoroutine)
     {
         // Stop any ongoing scroll animation.
         if (scrollCoroutine != null)
@@ -64,74 +103,81 @@ public class UIItemCarousel : NetworkBehaviour
         }
 
         // Remove all existing items from the Content immediately.
-        while (content.childCount > 0)
+        while (carouselContent.childCount > 0)
         {
-            Transform child = content.GetChild(0);
+            Transform child = carouselContent.GetChild(0);
             child.SetParent(null);
             Destroy(child.gameObject);
         }
 
         // Create the new items.
-        foreach (string itemName in items)
+        for (int i = 0; i < items.Count; i++)
         {
-            var itemData = ItemData.Instance.GetItemInfoFromName(itemName);
+            ItemInformation itemData = ItemData.Instance.GetItemInfoFromName(items[i]);
 
             if (itemData.itemUI == null)
+            {
+                Debug.Log($"Couldn't load item: {items[i]}");
                 continue;
+            }
 
-            Instantiate(itemData.itemUI, content, false);
+            Debug.Log(carouselContent.name);
+            GameObject tempItem = Instantiate(itemData.itemUI, carouselContent, false);
+            UIItem tempItemUI = tempItem.GetComponent<UIItem>();
+
+            tempItemUI.SetPlayerOwner(netIdentity);
+            tempItemUI.inventoryIndex = i;
         }
 
         // Update the item count and reset the selection.
-        ItemCount = content.childCount;
+        itemCount = carouselContent.childCount;
         selectedIndex = -1;
 
         // Recalculate the layout immediately.
         Canvas.ForceUpdateCanvases();
-        LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+        LayoutRebuilder.ForceRebuildLayoutImmediate(carouselContent);
 
         // Select and center the first item.
-        if (ItemCount > 0)
-            SelectItem(0);
+        if (itemCount > 0)
+            SelectItem(0, ref carouselContent, ref itemCount, ref selectedIndex, ref scrollCoroutine);
     }
 
 
 
-    public void SelectItem(int index)
+    public void SelectItem(int index, ref RectTransform carouselContent, ref int itemCount, ref int selectedIndex, ref Coroutine scrollCoroutine)
     {
-        if (ItemCount <= 0)
+        if (itemCount <= 0)
             return;
 
         // Clamp the requested index to valid bounds.
-        index = Mathf.Clamp(index, 0, ItemCount - 1);
-
-        Debug.Log($"Index: {index} || ItemCount: {ItemCount}");
-
+        index = Mathf.Clamp(index, 0, itemCount - 1);
         selectedIndex = index;
 
-        UpdateItemAppearance();
-        CenterOnSelectedItem(true);
+        UpdateItemAppearance(ref carouselContent, ref itemCount, ref selectedIndex);
+        CenterOnSelectedItem(true, ref carouselContent, ref itemCount, ref selectedIndex, ref scrollCoroutine);
     }
 
-    private void CenterOnSelectedItem(bool animate)
+    private void CenterOnSelectedItem(bool animate, ref RectTransform carouselContent, ref int itemCount, ref int selectedIndex, ref Coroutine scrollCoroutine)
     {
-        if (ItemCount == 0)
+        if (itemCount == 0)
             return;
 
-        float itemWidth = ((RectTransform)content.GetChild(0)).rect.width;
-        float spacing = content.GetComponent<HorizontalLayoutGroup>().spacing;
+        float itemWidth = ((RectTransform)carouselContent.GetChild(0)).rect.width;
+        float spacing = carouselContent.GetComponent<HorizontalLayoutGroup>().spacing;
 
         float itemStep = itemWidth + spacing;
 
         // Total width occupied by items and spacing
-        float totalWidth = (ItemCount * itemWidth) + ((ItemCount - 1) * spacing);
+        float totalWidth = (itemCount * itemWidth) + ((itemCount - 1) * spacing);
 
         // Position selected item relative to the content center
         float targetX = (totalWidth / 2f)
                       - (itemWidth / 2f)
                       - (selectedIndex * itemStep);
 
-        Vector2 target = new Vector2(targetX, content.anchoredPosition.y);
+
+
+        Vector2 target = new Vector2(targetX, carouselContent.anchoredPosition.y);
 
         if (scrollCoroutine != null)
         {
@@ -140,34 +186,29 @@ public class UIItemCarousel : NetworkBehaviour
         }
 
         if (animate)
-            scrollCoroutine = StartCoroutine(AnimateScroll(target));
+            scrollCoroutine = StartCoroutine(AnimateScroll(target, carouselContent));
         else
-            content.anchoredPosition = target;
+            carouselContent.anchoredPosition = target;
     }
 
-    private void UpdateItemAppearance()
+    private void UpdateItemAppearance(ref RectTransform carouselContent, ref int itemCount, ref int selectedIndex)
     {
-        for (int i = 0; i < ItemCount; i++)
+        for (int i = 0; i < itemCount; i++)
         {
-            RectTransform item = content.GetChild(i).GetComponent<RectTransform>();
-            if (item != null) item.localScale = Vector3.one * (i == selectedIndex ? 1.05f : 0.9f);
+            RectTransform item = carouselContent.GetChild(i).GetComponent<RectTransform>();
+            if (item != null) item.localScale = Vector3.one * (i == selectedIndex ? 1.1f : 0.6f);
 
-            if (i == selectedIndex - 1 || i == selectedIndex || i == selectedIndex + 1)
-            {
-                content.GetChild(i).GetComponent<CanvasGroup>().alpha = 1f;
-            }
-            else
-            {
-                content.GetChild(i).GetComponent<CanvasGroup>().alpha = 0f;
-            }
+            UIItem itemUI = item.GetComponent<UIItem>();
+
+            itemUI.UpdateItemUsable();
+            itemUI.UpdateItemAppearance(selectedIndex);
         }
 
-
     }
 
-    private IEnumerator AnimateScroll(Vector2 target)
+    private IEnumerator AnimateScroll(Vector2 target, RectTransform carouselContent)
     {
-        Vector2 start = content.anchoredPosition;
+        Vector2 start = carouselContent.anchoredPosition;
         float elapsed = 0f;
 
         while (elapsed < scrollDuration)
@@ -177,11 +218,10 @@ public class UIItemCarousel : NetworkBehaviour
             float t = Mathf.Clamp01(elapsed / scrollDuration);
             t = t * t * (3f - 2f * t);
 
-            content.anchoredPosition = Vector2.Lerp(start, target, t);
+            carouselContent.anchoredPosition = Vector2.Lerp(start, target, t);
             yield return null;
         }
 
-        content.anchoredPosition = target;
-        scrollCoroutine = null;
+        carouselContent.anchoredPosition = target;
     }
 }

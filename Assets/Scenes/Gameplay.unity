@@ -16808,38 +16808,62 @@ MonoBehaviour:
     itemOBJ: {fileID: 6697757221375349563, guid: 023eab5c46072724195ef5e4655f813d, type: 3}
     itemUI: {fileID: 516755676903620534, guid: 63cf0a8355a373541815203d86e8b3b3, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
   DrawBloodFromOpponentInfo:
     itemOBJ: {fileID: 6697757221375349563, guid: b70d88bf912df524aa225eb87f4881bd, type: 3}
     itemUI: {fileID: 516755676903620534, guid: ad8c27f43fbd1354a9f897d92b91f8fa, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
   DrawCursedBoxTwiceInfo:
     itemOBJ: {fileID: 6697757221375349563, guid: 75034409db0f02a4288d0c03bcfb820e, type: 3}
     itemUI: {fileID: 516755676903620534, guid: 21a336029cc56c14da7566efe24d9489, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
   ForceDrawEveryoneInfo:
     itemOBJ: {fileID: 6697757221375349563, guid: b63a445520fdad04e86b284c50ffe8b0, type: 3}
     itemUI: {fileID: 516755676903620534, guid: 4eaa8076d99f303498c78cb28be16a82, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
   ForceDrawInfo:
     itemOBJ: {fileID: 6697757221375349563, guid: b59daa87648641d45bf62d6e38c9860d, type: 3}
     itemUI: {fileID: 516755676903620534, guid: 5fbdd7fe485b9954fbc84ad144465aec, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
   IncraseDeathChanceInfo:
     itemOBJ: {fileID: 6697757221375349563, guid: 86ed20abb08d81441a8817ba6f6f9884, type: 3}
     itemUI: {fileID: 516755676903620534, guid: 1f5ef5051240f90498f20142997f05e2, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
   PeakInsideInfo:
     itemOBJ: {fileID: 6697757221375349563, guid: 5492f347f1a5f53408fb4164c012dc1d, type: 3}
     itemUI: {fileID: 516755676903620534, guid: 553387559984ca241a429dcf286a1105, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
   SkipTurnInfo:
     itemOBJ: {fileID: 6697757221375349563, guid: 9664783c2e44a274e9d175a42253f12a, type: 3}
     itemUI: {fileID: 516755676903620534, guid: a9ef3364eb10d694e8627533f8cfe59b, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
   TakeTwoLivesInfo:
     itemOBJ: {fileID: 6697757221375349563, guid: 4221261ba42f0904a8d073f0868e2a6c, type: 3}
     itemUI: {fileID: 516755676903620534, guid: 7bba9f5a4286db14d8c48aef523185dd, type: 3}
     itemDescription: 
+    isCursedBoxItem: 1
+    isItemBoxItem: 0
+  BloodPackInfo:
+    itemOBJ: {fileID: 6697757221375349563, guid: 29d4831befca5574dbdac652bb3ad43b, type: 3}
+    itemUI: {fileID: 4924130521613648613, guid: 3dfa34b092b44a6498024188410ea0d0, type: 3}
+    itemDescription: 
+    isCursedBoxItem: 0
+    isItemBoxItem: 1
 --- !u!1001 &1984656053
 PrefabInstance:
   m_ObjectHideFlags: 0

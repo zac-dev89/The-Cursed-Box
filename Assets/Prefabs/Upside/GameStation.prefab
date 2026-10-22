@@ -388,8 +388,8 @@ MonoBehaviour:
   isDeathCard: 0
   currentDeathCardChance: 0
   gambleForItemTrigger: {fileID: 1326067382463114522}
-  addBloodPackTrigger: {fileID: 6493299122568286916}
-  insertItemCardTrigger: {fileID: 8428901435935921002}
+  insertItemBoxItemTrigger: {fileID: 6493299122568286916}
+  insertCursedBoxItemTrigger: {fileID: 8428901435935921002}
   drawCursedBoxCardTrigger: {fileID: 3932564044619724567}
 --- !u!1 &6493299122568286916
 GameObject:
@@ -403,7 +403,7 @@ GameObject:
   - component: {fileID: 529693162330760386}
   - component: {fileID: 8915194695899377695}
   m_Layer: 0
-  m_Name: AddBloodPack
+  m_Name: AddItemBoxItem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -582,7 +582,7 @@ GameObject:
   - component: {fileID: 3087164140293341086}
   - component: {fileID: 7215151887682799634}
   m_Layer: 0
-  m_Name: AddItem
+  m_Name: AddCursedBoxItem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

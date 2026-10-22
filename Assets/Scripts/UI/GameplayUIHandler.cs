@@ -12,6 +12,7 @@ public class GameplayUIHandler : NetworkBehaviour
     [Header("Main References")]
     public GameObject gameplayUICanvas;
     public PlayerGameState playerGameState;
+    public PlayerController playerController;
 
 
     [Header("Gameplay Panels")]
@@ -43,11 +44,16 @@ public class GameplayUIHandler : NetworkBehaviour
     public GameObject drawCursedCardPanel;
     public List<GameObject> cursedboxUIPanels = new List<GameObject>();
 
+    [Header("Mouse Cursors")]
+    public Texture2D pointerHand;
+    public Texture2D interactHand;
+    private Texture2D currentHandCursor;
+    private bool isCursorOnInteractableButton;
 
-
-    private void Start()
+    public void Start()
     {
-
+        if (playerGameState.playerType != PlayerType.PlayerControlled || !isLocalPlayer) return;
+        TogglePointerHandCursor();
     }
 
     public void DisableUI()
@@ -57,6 +63,12 @@ public class GameplayUIHandler : NetworkBehaviour
     public void EnableUI()
     {
         gameplayUICanvas.SetActive(true);
+    }
+
+    private void Update()
+    {
+        if (playerGameState.playerType != PlayerType.PlayerControlled || !isLocalPlayer) return;
+        CursorBehaviour();
     }
 
     #region Toggle Panels
@@ -141,20 +153,9 @@ public class GameplayUIHandler : NetworkBehaviour
 
     #endregion
 
-
     #region Non Turn UI
 
     #endregion
-
-    public void UpdateItemsUI()
-    {
-        List<string> items = playerGameState.specialItemsList.ToList<string>();
-
-        UpdateBloodPackUI(items);
-        itemCarousel.UpdateItemCarousel(items);
-
-    }
-
 
     #region Itembox UI
     public void UpdateBloodLevel(int newBloodLevel)
@@ -162,23 +163,56 @@ public class GameplayUIHandler : NetworkBehaviour
         bloodAmountText.text = $"{newBloodLevel} blood sacrifices left.";
     }
 
-    private void UpdateBloodPackUI(List<string> items)
-    {
-        int bloodPackCount = 0;
-
-        foreach (string curr_item in items)
-        {
-            if (curr_item == "BloodPack") bloodPackCount++;
-        }
-
-        bloodPackAmountText.text = $"{bloodPackCount}";
-    }
-
     #endregion
-
 
     #region Cursedbox UI
 
     #endregion
 
+    public void UpdateCursedBoxItemsUI()
+    {
+        itemCarousel.UpdateCursedBoxUI(playerGameState.cursedBoxItemsList.ToList<string>());
+    }
+    public void UpdateItemBoxItemsUI() 
+    {
+        itemCarousel.UpdateItemBoxUI(playerGameState.itemBoxItemsList.ToList<string>());
+    }
+
+    #region Cursors
+
+    public void CursorOnInteractableButton(bool isOnButton)
+    {
+        isCursorOnInteractableButton = isOnButton;
+    }
+
+    private void CursorBehaviour()
+    {
+        if (playerController.isCursorOnInteractable || isCursorOnInteractableButton)
+        {
+            ToggleInteractionCursor();
+        }
+        else
+        {
+            TogglePointerHandCursor();
+        }
+    }
+
+    public void TogglePointerHandCursor()
+    {
+        ChangeCursor(pointerHand);
+    }
+    public void ToggleInteractionCursor()
+    {
+        ChangeCursor(interactHand);
+    }
+
+    public void ChangeCursor(Texture2D newCursor)
+    {
+        if (newCursor == currentHandCursor) return;
+
+        Vector2 cursorHostpot = new Vector2(0, 0);
+        Cursor.SetCursor(newCursor, cursorHostpot, CursorMode.Auto);
+        currentHandCursor = newCursor;
+    }
+    #endregion
 }

@@ -1,7 +1,6 @@
-using UnityEngine;
 using Mirror;
-using Unity.VisualScripting;
 using System.Collections;
+using UnityEngine;
 
 public class PlayerController : NetworkBehaviour
 {
@@ -25,6 +24,7 @@ public class PlayerController : NetworkBehaviour
     bool hasCursorInteractHit;
     Ray cursorInteractRay;
     RaycastHit cursorInteractHit;
+    public bool isCursorOnInteractable;
 
 
     public override void OnStartLocalPlayer()    
@@ -84,6 +84,19 @@ public class PlayerController : NetworkBehaviour
     {
         cursorInteractRay = camera.ScreenPointToRay(Input.mousePosition);
         hasCursorInteractHit = Physics.Raycast(cursorInteractRay, out cursorInteractHit);
+
+        Interactable tempInteractable = cursorInteractHit.collider.GetComponent<Interactable>();
+        InteractablePassOver tempInteractablePassOver = cursorInteractHit.collider.GetComponent<InteractablePassOver>();
+
+        if ((tempInteractable != null && tempInteractable.CanInteract(cursorInteractHit.collider.gameObject, this.netIdentity).canInteract) ||
+            (tempInteractablePassOver != null && tempInteractablePassOver.GetInteractableTarget().CanInteract(cursorInteractHit.collider.gameObject, this.netIdentity).canInteract))
+        {
+            isCursorOnInteractable = true;
+        }
+        else
+        {
+            isCursorOnInteractable = false;
+        }
     }
 
     private void TryInteract(RaycastHit interactHit, Vector3 origin, Vector3 direction)
@@ -152,10 +165,10 @@ public class PlayerController : NetworkBehaviour
 
         if (tabletopState == PlayerTabletopState.Itembox)
         {
-            if (tabletopTurn.inBloodPackMode)
+            if (tabletopTurn.inItemBoxInsertMode)
             {
                 gameplayUIHandler.ToggleAddBloodPackPanel();
-                FocusOnInteractable(GameManager.Instance.cursedBoxStation.addBloodPackTrigger.transform, 30f, .5f);
+                FocusOnInteractable(GameManager.Instance.cursedBoxStation.insertItemBoxItemTrigger.transform, 30f, .5f);
             }
             else
             {
@@ -170,10 +183,10 @@ public class PlayerController : NetworkBehaviour
         }
         else if (tabletopState == PlayerTabletopState.Cursedbox)
         {
-            if (tabletopTurn.inItemCardMode)
+            if (tabletopTurn.inCursedBoxInsertMode)
             {
                 gameplayUIHandler.ToggleAddItemsPanel();
-                FocusOnInteractable(GameManager.Instance.cursedBoxStation.insertItemCardTrigger.transform, 30f, .5f);
+                FocusOnInteractable(GameManager.Instance.cursedBoxStation.insertCursedBoxItemTrigger.transform, 30f, .5f);
             }
             else
             {
@@ -241,7 +254,7 @@ public class PlayerController : NetworkBehaviour
     {
         PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
 
-        if (playerTabletopTurn.inTurn && playerTabletopTurn.inBloodPackMode && !playerTabletopTurn.hasUsedBloodPack)
+        if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemBoxInsertMode && !playerTabletopTurn.hasUsedItemBoxItem)
         {
             CmdTryExitBloodPackMode();
         }
@@ -252,7 +265,7 @@ public class PlayerController : NetworkBehaviour
     {
         PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
 
-        if (playerTabletopTurn.inTurn && playerTabletopTurn.inBloodPackMode && !playerTabletopTurn.hasUsedBloodPack)
+        if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemBoxInsertMode && !playerTabletopTurn.hasUsedItemBoxItem)
         {
             GameManager.Instance.cursedBoxStation.ServerExitBloodPackMode(this.netIdentity);
         }
@@ -278,7 +291,7 @@ public class PlayerController : NetworkBehaviour
     {
         PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
 
-        if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemCardMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.specialItemsCap)
+        if (playerTabletopTurn.inTurn && playerTabletopTurn.inCursedBoxInsertMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.specialItemsCap)
         {
             CmdTryExitItemCardMode();
         }
@@ -289,7 +302,7 @@ public class PlayerController : NetworkBehaviour
     {
         PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
 
-        if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemCardMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.specialItemsCap)
+        if (playerTabletopTurn.inTurn && playerTabletopTurn.inCursedBoxInsertMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.specialItemsCap)
         {
             GameManager.Instance.cursedBoxStation.ServerExitItemCardMode(this.netIdentity);
         }

@@ -122,7 +122,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1682277673485583012}
   - component: {fileID: 6793724361317625874}
-  - component: {fileID: 2220931405737342421}
   m_Layer: 0
   m_Name: BaseItem
   m_TagString: Untagged
@@ -163,20 +162,3 @@ MonoBehaviour:
   serverOnly: 0
   visibility: 0
   hasSpawned: 0
---- !u!114 &2220931405737342421
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9090532794354338701}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 18a6fce903f925446900155d8026a818, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BaseSpecialItem
-  syncDirection: 0
-  syncMode: 0
-  syncInterval: 0
-  itemMeshes:
-  - {fileID: 6232102156612516256}

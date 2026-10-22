@@ -6,6 +6,8 @@ public struct ItemInformation
     public GameObject itemOBJ;
     public GameObject itemUI;
     public string itemDescription;
+    public bool isCursedBoxItem;
+    public bool isItemBoxItem;
 }
 
 
@@ -13,7 +15,7 @@ public class ItemData : MonoBehaviour
 {
     public static ItemData Instance;
 
-    [Header("Items GameObjects")]
+    [Header("Cursed Box Items")]
     [Space]
     public ItemInformation DecreaseDeathChanceInfo;
     public ItemInformation DrawBloodFromOpponentInfo;
@@ -24,6 +26,10 @@ public class ItemData : MonoBehaviour
     public ItemInformation PeakInsideInfo;
     public ItemInformation SkipTurnInfo;
     public ItemInformation TakeTwoLivesInfo;
+
+    [Header("Item Box Items")]
+    [Space]
+    public ItemInformation BloodPackInfo;
 
 
     private void Awake()
@@ -66,6 +72,9 @@ public class ItemData : MonoBehaviour
                 break;
             case "TakeTwoLives":
                 itemInfo = TakeTwoLivesInfo;
+                break;
+            case "BloodPack":
+                itemInfo = BloodPackInfo;
                 break;
 
         }

@@ -1,5 +1,7 @@
 using Mirror;
-using Unity.Collections.LowLevel.Unsafe;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 
@@ -30,11 +32,11 @@ public struct PlayerTabletopTurn
     public bool inTurn;
     public PlayerTabletopState playerTabletopState;
 
-    public bool inBloodPackMode;
-    public bool inItemCardMode;
+    public bool inItemBoxInsertMode;
+    public bool inCursedBoxInsertMode;
 
     public bool hasGambledForItem;
-    public bool hasUsedBloodPack;
+    public bool hasUsedItemBoxItem;
     public int insertedItems;
     public bool hasDrawnCursedCard;
 
@@ -91,8 +93,11 @@ public class PlayerGameState : NetworkBehaviour
 
     public override void OnStartClient()
     {
-        specialItemsList.OnAdd += OnItemAdded;
-        specialItemsList.OnRemove += OnItemRemoved;
+        cursedBoxItemsList.OnAdd += OnCursedBoxItemAdded;
+        cursedBoxItemsList.OnRemove += OnCursedBoxItemRemoved;
+
+        itemBoxItemsList.OnAdd += OnItemBoxItemAdded;
+        itemBoxItemsList.OnRemove += OnItemBoxItemRemoved;
     }
 
 
@@ -199,7 +204,8 @@ public class PlayerGameState : NetworkBehaviour
 
     #region Tabletop Gameplay
     [Header("Tabletop Gameplay")]
-    public readonly SyncList<string> specialItemsList = new SyncList<string>();
+    public readonly SyncList<string> itemBoxItemsList = new SyncList<string>();
+    public readonly SyncList<string> cursedBoxItemsList = new SyncList<string>();
 
 
     private void OnTabletopTurn(PlayerTabletopTurn oldValue, PlayerTabletopTurn newValue)
@@ -219,7 +225,7 @@ public class PlayerGameState : NetworkBehaviour
     {
         for (int i = 0; i < GameManager.Instance.cursedBoxStation.allItems.Count; i++)
         {
-            int randomAmount = Random.Range(1, 3);
+            int randomAmount = Random.Range(2, 5);
 
             for (int j = 0; j < randomAmount; j++)
             {
@@ -230,50 +236,110 @@ public class PlayerGameState : NetworkBehaviour
 
     [Server]
     public void ServerRetrievedItem(string item)
-    {   
-        specialItemsList.Add(item);
+    {
+        ItemInformation itemInfo = ItemData.Instance.GetItemInfoFromName(item);
+
+        if (itemInfo.isCursedBoxItem)
+        {
+            ServerRetrievedCursedBoxItem(item);
+        }
+        else if (itemInfo.isItemBoxItem)
+        {
+            ServerRetrievedItemBoxItem(item);
+        }
     }
     [Server]
     public void ServerRemoveItem(string item)
     {
-        specialItemsList.Remove(item);
-    }
+        ItemInformation itemInfo = ItemData.Instance.GetItemInfoFromName(item);
 
-
-    // On changed functions
-    void OnItemAdded(int index)
-    {
-        //Debug.Log($"Element added at index {index} {specialItemsList[index]}");
-        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        if (itemInfo.isCursedBoxItem)
         {
-            gameplayUIHandler.UpdateItemsUI();
+            ServerRemoveCursedBoxItem(item);
+        }
+        else if (itemInfo.isItemBoxItem)
+        {
+            ServerRemoveItemBoxItem(item);
         }
     }
-    void OnItemRemoved(int index, string oldValue)
+
+    // Cursed Box Items
+    [Server]
+    public void ServerRetrievedCursedBoxItem(string item)
+    {
+        cursedBoxItemsList.Add(item);
+    }
+    [Server]
+    public void ServerRemoveCursedBoxItem(string item)
+    {
+        cursedBoxItemsList.Remove(item);
+    }
+
+    void OnCursedBoxItemAdded(int index)
+    {
+        //Debug.Log($"Cursed Box Item Added {index} {cursedBoxItemsList[index]}");
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            gameplayUIHandler.UpdateCursedBoxItemsUI();
+        }
+    }
+    void OnCursedBoxItemRemoved(int index, string oldValue)
     {
         //Debug.Log($"Element removed at index {index} {oldValue}");
         if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
         {
-            gameplayUIHandler.UpdateItemsUI();
+            gameplayUIHandler.UpdateCursedBoxItemsUI();
+        }
+    }
+
+
+
+    // Item Box Items
+    [Server]
+    public void ServerRetrievedItemBoxItem(string item)
+    {
+        itemBoxItemsList.Add(item);
+    }
+    [Server]
+    public void ServerRemoveItemBoxItem(string item)
+    {
+        itemBoxItemsList.Remove(item);
+    }
+
+    [Server]
+    void OnItemBoxItemAdded(int index)
+    {
+        //Debug.Log($"Item Box Item Added {index} {itemBoxItemsList[index]}");
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            gameplayUIHandler.UpdateItemBoxItemsUI();
+        }
+    }
+    [Server]
+    void OnItemBoxItemRemoved(int index, string oldValue)
+    {
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            gameplayUIHandler.UpdateItemBoxItemsUI();
         }
     }
 
 
     // Using and Finding Items
-    public bool InventoryContainsItem(string itemName)
+    public bool InventoryContainsItem(string itemName, List<string> itemsInventory)
     {
-        foreach (string curr_item in specialItemsList)
+        foreach (string curr_item in itemsInventory)
         {
             if (curr_item == itemName) return true;
         }
         return false;
     }
 
-    public int GetQuantityOfItem(string itemName)
+    public int GetQuantityOfItem(string itemName, List<string> itemsInventory)
     {
         int quantity = 0;
 
-        foreach (string curr_item in specialItemsList)
+        foreach (string curr_item in itemsInventory)
         {
             if (curr_item == itemName) quantity++;
         }
@@ -297,8 +363,8 @@ public class PlayerGameState : NetworkBehaviour
     {
         Debug.Log("Try Add Blood Pack");
 
-        if (!InventoryContainsItem("BloodPack")) return;
-        if (playerTabletopTurn.hasUsedBloodPack) return;
+        if (!InventoryContainsItem("BloodPack", itemBoxItemsList.ToList<string>())) return;
+        if (playerTabletopTurn.hasUsedItemBoxItem) return;
 
         Debug.Log("Can Use Blood Pack");
 
@@ -308,8 +374,8 @@ public class PlayerGameState : NetworkBehaviour
     [Command]
     private void CmdTryAddBloodPack()
     {
-        if (!InventoryContainsItem("BloodPack")) return;
-        if (playerTabletopTurn.hasUsedBloodPack) return;
+        if (!InventoryContainsItem("BloodPack", itemBoxItemsList.ToList<string>())) return;
+        if (playerTabletopTurn.hasUsedItemBoxItem) return;
 
         GameManager.Instance.cursedBoxStation.ServerAddBloodPack(this.netIdentity);
     }
@@ -329,6 +395,23 @@ public class PlayerGameState : NetworkBehaviour
 
 
     // Cursed Box
+    public void TryUseItem(string itemName)
+    {
+        if (GameManager.Instance.cursedBoxStation.CanInsertItem(netIdentity, itemName))
+        {
+            CmdTryUseItem(itemName);
+        }
+    }
+
+    [Command]
+    private void CmdTryUseItem(string itemName)
+    {
+        if (GameManager.Instance.cursedBoxStation.CanInsertItem(netIdentity, itemName))
+        {
+            GameManager.Instance.cursedBoxStation.ServerInsertItem(netIdentity, itemName);
+        }
+    }
+
 
     #endregion
 

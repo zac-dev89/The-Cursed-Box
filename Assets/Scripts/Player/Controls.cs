@@ -21,4 +21,8 @@ public static class Controls
 
     public static KeyCode finishedWithTabletopMode = KeyCode.Space;
     public static KeyCode exitOutOfItemMode = KeyCode.Tab;
+
+    // Item Inventory
+    public static KeyCode selectLeftItem = KeyCode.A;
+    public static KeyCode selectRightItem = KeyCode.D;
 }

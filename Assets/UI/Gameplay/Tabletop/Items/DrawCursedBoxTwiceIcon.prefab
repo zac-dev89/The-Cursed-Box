@@ -8,6 +8,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2523960516725681306, guid: 3be9f706101f21f438e53f9ad6935444, type: 3}
+      propertyPath: itemName
+      value: DrawCursedBoxTwice
+      objectReference: {fileID: 0}
     - target: {fileID: 2987417903534909268, guid: 3be9f706101f21f438e53f9ad6935444, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -90,12 +94,12 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4924130521613648613, guid: 3be9f706101f21f438e53f9ad6935444, type: 3}
       propertyPath: m_Name
-      value: IncraseDeathChanceIcon
+      value: DrawCursedBoxTwiceIcon
       objectReference: {fileID: 0}
     - target: {fileID: 7921360596134766290, guid: 3be9f706101f21f438e53f9ad6935444, type: 3}
       propertyPath: m_Texture
       value: 
-      objectReference: {fileID: 2800000, guid: c941b844bc05bd64b87c42e3c489ff29, type: 3}
+      objectReference: {fileID: 2800000, guid: bc45dc6251396f043ad5efcd8d3d2e2b, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
