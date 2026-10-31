@@ -26,6 +26,7 @@ public class ItemData : MonoBehaviour
     public ItemInformation PeakInsideInfo;
     public ItemInformation SkipTurnInfo;
     public ItemInformation TakeTwoLivesInfo;
+    public ItemInformation ReverseDirectionInfo;
 
     [Header("Item Box Items")]
     [Space]
@@ -75,6 +76,9 @@ public class ItemData : MonoBehaviour
                 break;
             case "BloodPack":
                 itemInfo = BloodPackInfo;
+                break;
+            case "ReverseDirection":
+                itemInfo = ReverseDirectionInfo;
                 break;
 
         }

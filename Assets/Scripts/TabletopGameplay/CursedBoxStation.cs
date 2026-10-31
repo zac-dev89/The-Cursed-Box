@@ -1,6 +1,7 @@
 using Mirror;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 
 public class CursedBoxStation : Interactable
@@ -25,15 +26,29 @@ public class CursedBoxStation : Interactable
 
     [Space]
 
-    public int specialItemsCap = 4;
+    public int cursedBoxItemsCap = 4;
     public float deathCardChanceIncrement = 10f;
-
 
 
     [Header("Current Station Gameplay State")]
     [SyncVar] public bool isDeathCard;
     [SyncVar] public float currentDeathCardChance;
     private readonly SyncList<string> usedItemsInTurn = new SyncList<string>();
+
+    // Item States
+    [HideInInspector, SyncVar] public bool increaseDeathChanceItemInserted;
+    [HideInInspector, SyncVar] public bool takeTwoLivesItemInserted;
+    [HideInInspector, SyncVar] public bool skipTurnItemInserted;
+    [HideInInspector, SyncVar] public bool drawTwiceItemInserted;
+    [HideInInspector, SyncVar] public bool forceDrawItemInserted;
+    [HideInInspector, SyncVar] public bool everyoneForceDrawItemInserted;
+
+    [Space]
+
+    [HideInInspector, SyncVar] public bool playerMustDrawTwice;
+    [HideInInspector, SyncVar] public bool playerMustForceDraw;
+    [HideInInspector, SyncVar] public bool everyoneMustForceDraw;
+    private int playerForceDrawCount;
 
 
     [Header("Interaction Triggers")]
@@ -42,6 +57,11 @@ public class CursedBoxStation : Interactable
     public GameObject insertCursedBoxItemTrigger;
     public GameObject drawCursedBoxCardTrigger;
 
+    [Header("Other Look At PTs")]
+    public GameObject peekInsideCursedBox;
+
+    [Header("Cursed Box UI Screen")]
+    public TextMeshProUGUI peekInsideCursedBoxText;
 
     [Header("Coroutines")]
     private Coroutine facePlayerCoroutine;
@@ -60,14 +80,14 @@ public class CursedBoxStation : Interactable
     public void ServerInitializeCursedBoxStation()
     {
         currentDeathCardChance = deathCardChanceIncrement;
-        RefreshCursedBox();
+        ServerRefreshCursedBox();
         Invoke(nameof(ServerStartCursedBoxStation), 1.5f);
     }
 
     [Server]
     private void ServerStartCursedBoxStation()
     {
-        StartPlayerTurnCooldown(1f);
+        ServerStartPlayerTurnCooldown(1f);
         RpcStartCursedBoxStation(GameManager.Instance.currentPlayerTurn);
     }
 
@@ -79,6 +99,7 @@ public class CursedBoxStation : Interactable
         stationAnimator.PlayInFixedTime("StartCursedBoxStation", 0, 0);
         stationAnimator.Update(0f);
 
+        peekInsideCursedBoxText.gameObject.SetActive(false);
         ShouldShowStation(true);
     }
 
@@ -95,14 +116,59 @@ public class CursedBoxStation : Interactable
     #region Player Turns
 
     [Server]
-    public void ServerStartSwitchPlayerTurn()
+    public void ServerStartSwitchPlayerTurn(bool newRound)
     {
-        usedItemsInTurn.Clear();
-        RefreshCursedBox();
-        StartPlayerTurnCooldown(1f);
-        RpcStartSwitchPlayerTurn(GameManager.Instance.currentPlayerTurn);
+        if (newRound)
+        {
+            ServerIncreaseDeathChance(deathCardChanceIncrement);
+        }
 
+        // Incrase death chance
+        if (increaseDeathChanceItemInserted)
+        {
+            ServerIncreaseDeathChance(deathCardChanceIncrement);
+            increaseDeathChanceItemInserted = false;
+        }
+
+        // Drawing Twice
+        if (drawTwiceItemInserted)
+        {
+            drawTwiceItemInserted = false;
+            playerMustDrawTwice = true;
+        }
+
+        // Force Drawing
+        if (forceDrawItemInserted)
+        {
+            forceDrawItemInserted = false;
+            playerMustForceDraw = true;
+        }
+        else if (everyoneForceDrawItemInserted)
+        {
+            everyoneForceDrawItemInserted = false;
+            everyoneMustForceDraw = true;
+        }
+
+        if (playerMustForceDraw && playerForceDrawCount == 1)
+        {
+            playerMustForceDraw = false;
+            playerForceDrawCount = 0;
+            Debug.Log("Force Draw Finished");
+        }
+        else if (everyoneMustForceDraw && playerForceDrawCount == PlayerManager.Instance.players.Count - 1)
+        {
+            everyoneMustForceDraw = false;       
+            playerForceDrawCount = 0;
+            Debug.Log("Everyone Force Draw Finished");
+        }
+        
+
+        usedItemsInTurn.Clear();
+        ServerRefreshCursedBox();
+        ServerStartPlayerTurnCooldown(1f);
+        RpcStartSwitchPlayerTurn(GameManager.Instance.currentPlayerTurn);
     }
+
     [ClientRpc]
     private void RpcStartSwitchPlayerTurn(int currentPlayerTurn)
     {
@@ -150,8 +216,8 @@ public class CursedBoxStation : Interactable
         }
     }
 
-
-    private void StartPlayerTurnCooldown(float duration)
+    [Server]
+    private void ServerStartPlayerTurnCooldown(float duration)
     {
         if (playerTurnCoroutine != null) StopCoroutine(playerTurnCoroutine);
         playerTurnCoroutine = StartCoroutine(StartPlayerTurnCooldownTransition(duration));
@@ -162,6 +228,18 @@ public class CursedBoxStation : Interactable
         yield return new WaitForSeconds(duration);
         GameManager.Instance.ServerStartNewPlayersTurn();
     }
+
+    [Server]
+    public void ServerHideCursedBoxStation()
+    {
+        RpcHideCursedBoxStation();
+    }
+    [ClientRpc]
+    private void RpcHideCursedBoxStation()
+    {
+        stationAnimator.Play("EndCursedBoxStation");
+    }
+    
 
     #endregion
 
@@ -181,6 +259,9 @@ public class CursedBoxStation : Interactable
             PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox &&
             !PGS.playerTabletopTurn.hasGambledForItem &&
             !PGS.playerTabletopTurn.hasUsedItemBoxItem &&
+            !PGS.playerTabletopTurn.inInteractionCooldown &&
+            !playerMustForceDraw &&
+            !everyoneMustForceDraw &&
             PGS.currentBloodAmount > 0)
         {
             interactResult.canInteract = true;
@@ -191,6 +272,9 @@ public class CursedBoxStation : Interactable
             PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox &&
             !PGS.playerTabletopTurn.hasGambledForItem &&
             !PGS.playerTabletopTurn.hasUsedItemBoxItem &&
+            !PGS.playerTabletopTurn.inInteractionCooldown &&
+            !playerMustForceDraw &&
+            !everyoneMustForceDraw &&
             !PGS.playerTabletopTurn.inItemBoxInsertMode)
         {
             interactResult.canInteract = true;
@@ -199,8 +283,11 @@ public class CursedBoxStation : Interactable
 
         else if (hitObject == insertCursedBoxItemTrigger &&
             PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox &&
-            !PGS.playerTabletopTurn.hasDrawnCursedCard &&
-            PGS.playerTabletopTurn.insertedItems < specialItemsCap &&
+            !PGS.playerTabletopTurn.finishedCursedBoxDraw &&
+            PGS.playerTabletopTurn.insertedItems < cursedBoxItemsCap &&
+            !PGS.playerTabletopTurn.inInteractionCooldown &&
+            !playerMustForceDraw &&
+            !everyoneMustForceDraw &&
             !PGS.playerTabletopTurn.inCursedBoxInsertMode)
         {
             interactResult.canInteract = true;
@@ -209,7 +296,8 @@ public class CursedBoxStation : Interactable
 
         else if (hitObject == drawCursedBoxCardTrigger &&
             PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox &&
-            !PGS.playerTabletopTurn.hasDrawnCursedCard &&
+            !PGS.playerTabletopTurn.finishedCursedBoxDraw &&
+            !PGS.playerTabletopTurn.inInteractionCooldown &&
             !PGS.playerTabletopTurn.inCursedBoxInsertMode)
         {
             interactResult.canInteract = true;
@@ -256,6 +344,8 @@ public class CursedBoxStation : Interactable
         ItemInformation itemInfo = ItemData.Instance.GetItemInfoFromName(itemName);
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
+        if (PGS.playerTabletopTurn.inInteractionCooldown) return false;
+
         bool canInsert = false;
 
         if (itemInfo.isCursedBoxItem && PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox)
@@ -273,7 +363,17 @@ public class CursedBoxStation : Interactable
     [Server]
     public void ServerInsertItem(NetworkIdentity playerRef, string itemName)
     {
+        ItemInformation itemInfo = ItemData.Instance.GetItemInfoFromName(itemName);
+        PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
+        if (CanInsertCursedBoxItem(playerRef, itemName) && itemInfo.isCursedBoxItem && PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox)
+        {
+            ServerInsertCursedBoxItem(playerRef, itemName);
+        }
+        else if (CanInsertItemBoxItem(playerRef, itemName) && itemInfo.isItemBoxItem && PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox)
+        {
+            ServerInsertItemBoxItem(playerRef, itemName);
+        }
     }
 
 
@@ -294,8 +394,6 @@ public class CursedBoxStation : Interactable
     }
 
 
-    // BLOOD PACKS
-    [Server]
     private void ServerEnterBloodPackMode(NetworkIdentity playerRef)
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
@@ -335,8 +433,6 @@ public class CursedBoxStation : Interactable
 
     }
 
-
-
     private void GetRandomItems(NetworkIdentity playerRef)
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
@@ -346,28 +442,52 @@ public class CursedBoxStation : Interactable
         for (int i = 0; i < randomNumberOfItems; i++)
         {
             string gainedSpecialItem = allItems[Random.Range(0, allItems.Count)];
-            PGS.ServerRemoveItem(gainedSpecialItem);
+            PGS.ServerRetrievedItem(gainedSpecialItem);
         }
     }
 
     public bool CanInsertItemBoxItem(NetworkIdentity playerRef, string itemName)
     {
-        return false;
+        PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
+
+        if (PGS.playerTabletopTurn.hasUsedItemBoxItem) return false;
+
+        bool canInsert = false;
+
+        if (itemName == "BloodPack")
+        {
+            canInsert = true;
+        }
+
+        return canInsert;
+
     }
     [Server]
     public void ServerInsertItemBoxItem(NetworkIdentity playerRef, string itemName)
     {
-
+        switch (itemName)
+        {
+            case "BloodPack":
+                ServerAddBloodPack(playerRef);
+                break;
+        }
     }
 
     #endregion
 
 
     #region Cursed Box Gameplay
+    [Server]
+    public void ServerIncreaseDeathChance(float deathChanceAddition)
+    {
+        currentDeathCardChance += deathCardChanceIncrement;
+    }
+
 
     [Server]
-    private void RefreshCursedBox()
+    private void ServerRefreshCursedBox()
     {
+        Debug.Log("Death Card Chance: " + currentDeathCardChance);
         float randomChance = Random.Range(0f, 100f);
         isDeathCard = randomChance < currentDeathCardChance;
 
@@ -406,6 +526,10 @@ public class CursedBoxStation : Interactable
             return false;
         }
 
+        PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
+
+        if (PGS.playerTabletopTurn.insertedItems >= cursedBoxItemsCap) return false;
+
         bool canInsertItem = false;
 
         if (itemName == "DecreaseDeathChance")
@@ -424,7 +548,10 @@ public class CursedBoxStation : Interactable
         }
         else if (itemName == "DrawBloodFromOpponent")
         {
-            canInsertItem = true;
+            if (GetValidPlayerToStealBlood() != null)
+            {
+                canInsertItem = true;
+            }
         }
         else if (itemName == "DrawCursedBoxTwice")
         {
@@ -432,11 +559,17 @@ public class CursedBoxStation : Interactable
         }
         else if (itemName == "ForceDrawEveryone")
         {
-            canInsertItem = true;
+            if (!forceDrawItemInserted && !everyoneForceDrawItemInserted)
+            {
+                canInsertItem = true;
+            }
         }
         else if (itemName == "ForceDraw")
         {
-            canInsertItem = true;
+            if (!forceDrawItemInserted && !everyoneForceDrawItemInserted)
+            {
+                canInsertItem = true;
+            }
         }
         else if (itemName == "PeekInside")
         {
@@ -447,6 +580,13 @@ public class CursedBoxStation : Interactable
             canInsertItem = true;
         }
         else if (itemName == "TakeTwoLives")
+        {
+            if (!takeTwoLivesItemInserted)
+            {
+                canInsertItem = true;
+            }
+        }
+        else if (itemName == "ReverseDirection")
         {
             canInsertItem = true;
         }
@@ -460,31 +600,34 @@ public class CursedBoxStation : Interactable
         switch (itemName)
         {
             case "DecreaseDeathChance":
-                ServerDecreaseDeathChance(playerRef);
+                ServerDecreaseDeathChanceItem(playerRef);
                 break;
             case "IncreaseDeathChance":
-                ServerIncreaseDeathChance(playerRef);
+                ServerIncreaseDeathChanceItem(playerRef);
                 break;
             case "DrawBloodFromOpponent":
-                ServerDrawBloodFromOpponent(playerRef);
+                ServerDrawBloodFromOpponentItem(playerRef);
                 break;
             case "DrawCursedBoxTwice":
-                ServerDrawTwice(playerRef);
+                ServerDrawTwiceItem(playerRef);
                 break;
             case "ForceDrawEveryone":
-                ServerForceDrawEveryone(playerRef);
+                ServerForceDrawEveryoneItem(playerRef);
                 break;
             case "ForceDraw":
-                ServerForceDraw(playerRef);
+                ServerForceDrawItem(playerRef);
                 break;
             case "PeekInside":
-                ServerPeekInside(playerRef);
+                StartCoroutine(PeekInsideBehaviour(playerRef));
                 break;
             case "SkipTurn":
-                ServerSkipTurn(playerRef);
+                ServerSkipTurnItem(playerRef);
                 break;
             case "TakeTwoLives":
-                ServerTakeTwoLives(playerRef);
+                ServerTakeTwoLivesItem(playerRef);
+                break;
+            case "ReverseDirection":
+                ServerReverseDirectionItem(playerRef);
                 break;
             default:
                 break;
@@ -504,20 +647,47 @@ public class CursedBoxStation : Interactable
     }
 
     [Server]
-    private void ServerDrawCursedCard(NetworkIdentity playerRef)
+    public void ServerDrawCursedCard(NetworkIdentity playerRef)
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
         PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.hasDrawnCursedCard = true;
+
+        if (skipTurnItemInserted)
+        {
+            skipTurnItemInserted = false;
+            GameManager.Instance.ServerStartSwitchPlayerTurn();
+            return;
+        }
+
+        tempTabletopTurn.cursedBoxDrawCounter++;
+        //Debug.Log($"Player drew {tempTabletopTurn.cursedBoxDrawCounter} times. He must draw {(playerMustDrawTwice ? 2 : 1)} times");
+
+        if (tempTabletopTurn.cursedBoxDrawCounter == 1 && !playerMustDrawTwice)
+        {
+            tempTabletopTurn.finishedCursedBoxDraw = true;
+        }
+        else if (tempTabletopTurn.cursedBoxDrawCounter == 2 && playerMustDrawTwice)
+        {
+            tempTabletopTurn.finishedCursedBoxDraw = true;
+            playerMustDrawTwice = false;
+        }
 
         PGS.playerTabletopTurn = tempTabletopTurn;
 
+        if ((playerMustForceDraw || everyoneMustForceDraw) && tempTabletopTurn.finishedCursedBoxDraw)
+        {
+            playerForceDrawCount++;
+            Debug.Log($"Force Draw Count: {playerForceDrawCount}");
+        }
+
         if (isDeathCard)
         {
-            GameManager.Instance.ServerActivateDungeon(playerRef);
+            // Add life logic here
+            int livesToDeduct = takeTwoLivesItemInserted ? 2 : 1;
+            PGS.ServerRetrieveDeathCard(livesToDeduct);
         }
-        else
+        else if (tempTabletopTurn.finishedCursedBoxDraw)
         {
             GameManager.Instance.ServerStartSwitchPlayerTurn();
         }
@@ -525,57 +695,159 @@ public class CursedBoxStation : Interactable
 
 
     [Server]
-    private void ServerDecreaseDeathChance(NetworkIdentity playerRef)
+    private void ServerDecreaseDeathChanceItem(NetworkIdentity playerRef)
     {
         Debug.Log("DecreaseDeathChance");
+
+        currentDeathCardChance -= deathCardChanceIncrement;
+        currentDeathCardChance = Mathf.Clamp(currentDeathCardChance, deathCardChanceIncrement, 100f);
     }
 
     [Server]
-    private void ServerIncreaseDeathChance(NetworkIdentity playerRef)
+    private void ServerIncreaseDeathChanceItem(NetworkIdentity playerRef)
     {
         Debug.Log("IncreaseDeathChance");
+        increaseDeathChanceItemInserted = true;
+    }
+
+
+    private NetworkIdentity GetValidPlayerToStealBlood()
+    {
+        int targetPlayerIndex = GameManager.Instance.currentPlayerTurn;
+        NetworkIdentity target_player = null;
+
+        for (int i = 0; i < PlayerManager.Instance.players.Count; i++)
+        {
+            targetPlayerIndex += GameManager.Instance.direction;
+            targetPlayerIndex = GameManager.Instance.GetCorrectPlayerTurn(targetPlayerIndex);
+
+            NetworkIdentity temp_player = PlayerManager.Instance.players[targetPlayerIndex];
+
+            if (netIdentity != temp_player)
+            {
+                PlayerGameState temp_player_PGS = temp_player.GetComponent<PlayerGameState>();
+                if (temp_player_PGS.currentBloodAmount > 0)
+                {
+                    target_player = temp_player;
+                }
+            }
+        }
+
+        return target_player;
     }
 
     [Server]
-    private void ServerDrawBloodFromOpponent(NetworkIdentity playerRef)
+    private void ServerDrawBloodFromOpponentItem(NetworkIdentity robberRef)
     {
         Debug.Log("DrawBloodFromOpponent");
+        NetworkIdentity victim = GetValidPlayerToStealBlood();
+
+        if (victim == null) return;
+
+        PlayerGameState robber_PGS = robberRef.GetComponent<PlayerGameState>();
+        PlayerGameState victim_PGS = victim.GetComponent<PlayerGameState>();
+
+        robber_PGS.ServerRetrievedItem("BloodPack");
+        victim_PGS.currentBloodAmount--;
+        RpcStealBloodFromVictim(robberRef, victim);
+
+    }
+    [ClientRpc]
+    private void RpcStealBloodFromVictim(NetworkIdentity robberRef, NetworkIdentity victimRef)
+    {
+        Debug.Log($"{robberRef.name} Stole From {victimRef.name}");
     }
 
+
     [Server]
-    private void ServerDrawTwice(NetworkIdentity playerRef)
+    private void ServerDrawTwiceItem(NetworkIdentity playerRef)
     {
         Debug.Log("DrawTwice");
+        drawTwiceItemInserted = true;
     }
 
     [Server]
-    private void ServerForceDrawEveryone(NetworkIdentity playerRef)
+    private void ServerForceDrawEveryoneItem(NetworkIdentity playerRef)
     {
         Debug.Log("ForceDrawEveryone");
+        everyoneForceDrawItemInserted = true;
     }
 
     [Server]
-    private void ServerForceDraw(NetworkIdentity playerRef)
+    private void ServerForceDrawItem(NetworkIdentity playerRef)
     {
         Debug.Log("ForceDraw");
+        forceDrawItemInserted = true;
     }
 
+
+    private IEnumerator PeekInsideBehaviour(NetworkIdentity playerRef)
+    {
+        ServerPeekInsideItem(playerRef);
+        yield return new WaitForSeconds(2f);
+        ServerFinishedPeeking(playerRef);
+    }
     [Server]
-    private void ServerPeekInside(NetworkIdentity playerRef)
+    private void ServerPeekInsideItem(NetworkIdentity playerRef)
     {
         Debug.Log("PeekInside");
+        PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
+
+        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
+        tempTabletopTurn.inInteractionCooldown = true;
+        tempTabletopTurn.peekingAtBox = true;
+
+        PGS.playerTabletopTurn = tempTabletopTurn;
+
+        RpcShouldDisplayPeekInsideVisuals(true);
+    }
+    [Server]
+    private void ServerFinishedPeeking(NetworkIdentity playerRef)
+    {
+        PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
+
+        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
+        tempTabletopTurn.inInteractionCooldown = false;
+        tempTabletopTurn.peekingAtBox = false;
+
+        PGS.playerTabletopTurn = tempTabletopTurn;
+
+        RpcShouldDisplayPeekInsideVisuals(false);
+    }
+    [ClientRpc]
+    private void RpcShouldDisplayPeekInsideVisuals(bool isPeeking)
+    {
+        if (isPeeking)
+        {
+            peekInsideCursedBoxText.gameObject.SetActive(true);
+            peekInsideCursedBoxText.text = isDeathCard ? "DEATH" : "SAFE";
+        }
+        else
+        {
+            peekInsideCursedBoxText.gameObject.SetActive(false);
+        }
     }
 
+
     [Server]
-    private void ServerSkipTurn(NetworkIdentity playerRef)
+    private void ServerSkipTurnItem(NetworkIdentity playerRef)
     {
         Debug.Log("SkipTurn");
+        skipTurnItemInserted = true;
     }
 
     [Server]
-    private void ServerTakeTwoLives(NetworkIdentity playerRef)
+    private void ServerTakeTwoLivesItem(NetworkIdentity playerRef)
     {
         Debug.Log("TakeTwoLives");
+        takeTwoLivesItemInserted = true;
+    }
+
+    [Server]
+    private void ServerReverseDirectionItem(NetworkIdentity playerRef)
+    {
+        Debug.Log("Reverse Direction");
+        GameManager.Instance.direction *= -1;
     }
     #endregion
 }

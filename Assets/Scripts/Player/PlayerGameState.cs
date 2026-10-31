@@ -1,7 +1,6 @@
 using Mirror;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 
@@ -38,18 +37,25 @@ public struct PlayerTabletopTurn
     public bool hasGambledForItem;
     public bool hasUsedItemBoxItem;
     public int insertedItems;
-    public bool hasDrawnCursedCard;
 
+    public int cursedBoxDrawCounter;
+    public bool finishedCursedBoxDraw;
+
+    public bool inInteractionCooldown;
+    public bool peekingAtBox;
 }
 
 
 public class PlayerGameState : NetworkBehaviour
 {
     [Header("Main References")]
+    public Transform FPSCamera;
     public GameObject playerCam;
     public AIController AIController;
     public PlayerController playerController;
     public GameplayUIHandler gameplayUIHandler;
+    public Animator entirePlayerAnimator;
+    public Light flashLight;
 
 
     [Header("Player Type States")]
@@ -61,12 +67,8 @@ public class PlayerGameState : NetworkBehaviour
 
 
     [Header("Game States")]
-    public PlayerState playerState;
-    [SyncVar(hook = nameof(OnTabletopTurn))] public PlayerTabletopTurn playerTabletopTurn;
-
-    [Header("Blood Sacrificing")]
-    public int maxBloodSacrifices = 10;
-    [SyncVar(hook = nameof(OnBloodLevelChanged))] public int currentBloodAmount;
+    [SyncVar] public PlayerState playerState;
+    [SyncVar] public bool isAlive;
 
 
 
@@ -107,6 +109,8 @@ public class PlayerGameState : NetworkBehaviour
         gameplayUIHandler.EnableUI();
         playerCam.SetActive(true);
 
+        flashLight.enabled = false;
+
         // Local enabling
         playerType = PlayerType.PlayerControlled;
 
@@ -118,6 +122,8 @@ public class PlayerGameState : NetworkBehaviour
     {
         gameplayUIHandler.DisableUI();
         playerCam.SetActive(false);
+
+        flashLight.enabled = false;
     }
 
 
@@ -161,12 +167,17 @@ public class PlayerGameState : NetworkBehaviour
         playerState = PlayerState.Tabletop;
         currentBloodAmount = maxBloodSacrifices;
 
+        isAlive = true;
+        currentTabletopLives = tabletopLives;
 
         if (debug_GivePlayerAllItems) DEBUG_ServerGivePlayerAllItems();
 
-
-
+        // PLAYER ONLY
         RpcOnPlayerGameStarted();
+
+        // AI ONLY - THIS IS CALLED EVEN THOUGH A PLAYER IS CONTROLLING IT.
+        // It is just an edge case to make sure all controller variables are set up if a player leaves the game
+        AIController.ServerInitializeAIController();
     }
     [ClientRpc]
     private void RpcOnPlayerGameStarted()
@@ -174,11 +185,14 @@ public class PlayerGameState : NetworkBehaviour
         playerStartedInGame = true;
         playerState = PlayerState.Tabletop;
 
+        flashLight.enabled = false;
+
         if (isLocalPlayer && playerType == PlayerType.PlayerControlled)
         {
             playerController.OnPlayerControllerStarted();
         }
     }
+
     #endregion
 
     #region Player Turn Management
@@ -194,7 +208,16 @@ public class PlayerGameState : NetworkBehaviour
     {
         PlayerTabletopTurn temp = new PlayerTabletopTurn();
         temp.inTurn = true;
-        temp.playerTabletopState = PlayerTabletopState.Itembox;
+
+        if (GameManager.Instance.cursedBoxStation.playerMustForceDraw || GameManager.Instance.cursedBoxStation.everyoneMustForceDraw) 
+        {
+            // Make animation transition later
+            temp.playerTabletopState = PlayerTabletopState.Cursedbox;
+        }
+        else
+        {
+            temp.playerTabletopState = PlayerTabletopState.Itembox;
+        }
 
         playerTabletopTurn = temp;
     }
@@ -204,6 +227,17 @@ public class PlayerGameState : NetworkBehaviour
 
     #region Tabletop Gameplay
     [Header("Tabletop Gameplay")]
+    [SyncVar(hook = nameof(OnTabletopTurn))] public PlayerTabletopTurn playerTabletopTurn;
+
+
+    public int tabletopLives = 4;
+    [SyncVar(hook = nameof(OnTabletopLivesChanged))] public int currentTabletopLives;
+
+
+    public int maxBloodSacrifices = 10;
+    [SyncVar(hook = nameof(OnBloodLevelChanged))] public int currentBloodAmount;
+
+
     public readonly SyncList<string> itemBoxItemsList = new SyncList<string>();
     public readonly SyncList<string> cursedBoxItemsList = new SyncList<string>();
 
@@ -216,7 +250,42 @@ public class PlayerGameState : NetworkBehaviour
         {
             playerController.OnPlayerTabletopTurn(tabletopTurn);
         }
+
+
     }
+
+
+    private void OnTabletopLivesChanged(int oldValue, int newValue)
+    {
+        Debug.Log($"{newValue} Lives Left.");
+    }
+    [Server]
+    public void ServerRetrieveDeathCard(int lives)
+    {
+        currentTabletopLives = Mathf.Clamp(currentTabletopLives - lives, 0, tabletopLives);
+
+        if (currentTabletopLives == 0)
+        {
+            ServerTabletopDeath();
+        }
+        else
+        {
+            GameManager.Instance.ServerInitializeDungeon(netIdentity);
+        }
+    }
+    [Server]
+    private void ServerTabletopDeath()
+    {
+        isAlive = false;
+        RpcTabletopDeath();
+    }
+    [ClientRpc]
+    private void RpcTabletopDeath()
+    {
+        Debug.Log("Player Death!");
+    }
+
+   
 
     #region Items
 
@@ -225,7 +294,7 @@ public class PlayerGameState : NetworkBehaviour
     {
         for (int i = 0; i < GameManager.Instance.cursedBoxStation.allItems.Count; i++)
         {
-            int randomAmount = Random.Range(2, 5);
+            int randomAmount = Random.Range(2, 4);
 
             for (int j = 0; j < randomAmount; j++)
             {
@@ -306,7 +375,6 @@ public class PlayerGameState : NetworkBehaviour
         itemBoxItemsList.Remove(item);
     }
 
-    [Server]
     void OnItemBoxItemAdded(int index)
     {
         //Debug.Log($"Item Box Item Added {index} {itemBoxItemsList[index]}");
@@ -315,7 +383,6 @@ public class PlayerGameState : NetworkBehaviour
             gameplayUIHandler.UpdateItemBoxItemsUI();
         }
     }
-    [Server]
     void OnItemBoxItemRemoved(int index, string oldValue)
     {
         if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
@@ -349,7 +416,7 @@ public class PlayerGameState : NetworkBehaviour
 
     #endregion
 
-    #region Item box
+    #region Item Box
 
     private void OnBloodLevelChanged(int oldValue, int newValue)
     {
@@ -358,28 +425,6 @@ public class PlayerGameState : NetworkBehaviour
             gameplayUIHandler.UpdateBloodLevel(newValue);
         }
     }
-
-    public void TryAddBloodPack()
-    {
-        Debug.Log("Try Add Blood Pack");
-
-        if (!InventoryContainsItem("BloodPack", itemBoxItemsList.ToList<string>())) return;
-        if (playerTabletopTurn.hasUsedItemBoxItem) return;
-
-        Debug.Log("Can Use Blood Pack");
-
-        CmdTryAddBloodPack();
-    }
-
-    [Command]
-    private void CmdTryAddBloodPack()
-    {
-        if (!InventoryContainsItem("BloodPack", itemBoxItemsList.ToList<string>())) return;
-        if (playerTabletopTurn.hasUsedItemBoxItem) return;
-
-        GameManager.Instance.cursedBoxStation.ServerAddBloodPack(this.netIdentity);
-    }
-
 
     [Command]
     public void CmdFinishedWithItemBox()
@@ -393,7 +438,7 @@ public class PlayerGameState : NetworkBehaviour
 
     #endregion
 
-
+    #region Cursed Box
     // Cursed Box
     public void TryUseItem(string itemName)
     {
@@ -415,9 +460,158 @@ public class PlayerGameState : NetworkBehaviour
 
     #endregion
 
+    #endregion
+
+
+
     #region Dungeon Gameplay
+    [Header("Dungeon Gameplay")]
+    public bool isDungeonPlayerReady;
 
 
+
+    #region Dungeon Victim Gameplay
+
+    [Header("Dungeon Victim Gameplay")]
+    [SyncVar] public bool isMovingThroughGap;
+    float initialGapTransitionTime = 0.25f;
+    public float wallGapMoveTime;
+    public float crawlSpaceGapMoveTime;
+
+    [Space]
+    private NetworkIdentity SERVER_CurrentGap; 
+
+    [Server]
+    public void ServerSpawnVictimInDungeon(Vector3 spawnPosition, Quaternion spawnRotation)
+    {
+        playerState = PlayerState.DungeonVictim;
+        RpcSpawnVictimInDungeon(spawnPosition, spawnRotation);
+    }
+    [ClientRpc]
+    private void RpcSpawnVictimInDungeon(Vector3 spawnPosition, Quaternion spawnRotation)
+    {
+        // Dungeon Victim Ready
+
+        transform.position = spawnPosition;
+        transform.rotation = spawnRotation;
+
+        playerState = PlayerState.DungeonVictim;
+        flashLight.enabled = true;
+        
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            playerController.OnDungeonVictimStarted();
+            CmdReportReadyInDungeon();
+        }
+        else if (playerType == PlayerType.AIControlled && NetworkServer.active)
+        {
+            ServerReportReadyInDungeon();
+        }
+    }
+
+    // Gap Traversal
+
+    [Server]
+    public void ServerMoveThroughGap(Vector3 facingDirection, Vector3 gapEntrance, NetworkIdentity gapRef)
+    {
+        isMovingThroughGap = true;
+        SERVER_CurrentGap = gapRef;
+        RpcMoveThroughGap(facingDirection, gapEntrance, SERVER_CurrentGap.GetComponent<BaseGap>().gapAnimation);
+    }
+    [ClientRpc]
+    public void RpcMoveThroughGap(Vector3 facingDirection, Vector3 gapEntrance, string gapAnimation)
+    {
+        isMovingThroughGap = true;
+        if (isLocalPlayer && playerType == PlayerType.PlayerControlled) playerController.characterController.enabled = false;
+
+        StartCoroutine(MoveThroughGap(facingDirection, gapEntrance, gapAnimation));
+    }
+    IEnumerator MoveThroughGap(Vector3 facingDirection, Vector3 gapEntrance, string gapAnimation)
+    {
+        float elapsedTime = 0f;
+
+        gapEntrance.y = transform.position.y;
+
+        Quaternion initialFacingRotation = transform.rotation;
+        Quaternion targetFacingRotation = Quaternion.LookRotation(facingDirection);
+        Quaternion initialCameraRotation = FPSCamera.localRotation;
+
+        Vector3 initialPlayerPos = transform.position;
+        
+        // First move player to gap entrance
+        while (elapsedTime < initialGapTransitionTime)
+        {
+            elapsedTime += Time.deltaTime;
+
+            float t = Mathf.Clamp01(elapsedTime / initialGapTransitionTime);
+
+            transform.rotation = Quaternion.Lerp(initialFacingRotation, targetFacingRotation, t);
+            transform.position = Vector3.Lerp(initialPlayerPos, gapEntrance, t);
+            FPSCamera.localRotation = Quaternion.Lerp(initialCameraRotation, Quaternion.Euler(0, 0, 0), t);
+
+            yield return null;
+        }
+
+        entirePlayerAnimator.Play(gapAnimation, 0, 0f);
+    }
+
+    [Server]
+    private void ServerFinishedTraversingGap()
+    {
+        isMovingThroughGap = false;
+        SERVER_CurrentGap.GetComponent<BaseGap>().ServerFinishedMovingThroughGap();
+        RpcFinishedTraversingGap();
+    }
+    [ClientRpc]
+    private void RpcFinishedTraversingGap()
+    {
+        isMovingThroughGap = false;
+        
+        if (isLocalPlayer && playerType == PlayerType.PlayerControlled) playerController.characterController.enabled = true;
+    }
+
+    #endregion
+
+
+
+    #region Dungeon Hunter Gameplay
+
+    [Server]
+    public void ServerSpawnHunterInDungeon(Vector3 spawnPosition, Quaternion spawnRotation)
+    {
+        playerState = PlayerState.DungeonHunter;
+        RpcSpawnHunterInDungeon(spawnPosition, spawnRotation);
+    }
+    [ClientRpc]
+    private void RpcSpawnHunterInDungeon(Vector3 spawnPosition, Quaternion spawnRotation)
+    {
+        // Dungeon Hunter is spawned in and ready
+
+        playerState = PlayerState.DungeonHunter;
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer) 
+        {
+            CmdReportReadyInDungeon();
+        }
+        else if (playerType == PlayerType.AIControlled && NetworkServer.active)
+        {
+            ServerReportReadyInDungeon();
+        }
+    }
+    [Command]
+    private void CmdReportReadyInDungeon()
+    {
+        isDungeonPlayerReady = true;
+        GameManager.Instance.ServerCheckAllPlayersReadyInDungeon();
+    }
+    [Server]
+    private void ServerReportReadyInDungeon()
+    {
+        isDungeonPlayerReady = true;
+        GameManager.Instance.ServerCheckAllPlayersReadyInDungeon();
+    }
+
+
+    #endregion
 
     #endregion
 }

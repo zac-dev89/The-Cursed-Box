@@ -1,4 +1,5 @@
 using Mirror;
+using System.Collections;
 using UnityEngine;
 
 public class AIController : NetworkBehaviour
@@ -9,40 +10,73 @@ public class AIController : NetworkBehaviour
     [Header("Enabling Gameplay")]
     [SyncVar] public bool AIControllerEnabled;
 
+    [Header("AI Actions Timer")]
+    public float minActionTime = 1f;
+    public float maxActionTime = 3f;
+    private float currentActionTime = 0f;
+    private float elapsedActionTimer = 0f;
+
+    [Server]
+    public void ServerInitializeAIController()
+    {
+        currentActionTime = Random.Range(minActionTime, maxActionTime);
+    }
+
     private void Update()
     {
         if (!NetworkServer.active) return;
         if (!AIControllerEnabled) return;
+        if (!playerGameState.playerStartedInGame) return;
 
         if (playerGameState.playerState == PlayerState.Tabletop)
         {
-            TabletopGameplay();
+            ServerTabletopGameplay();
         }
         else if (playerGameState.playerState == PlayerState.DungeonHunter)
         {
-            DungeonHunterGameplay();
+            ServerDungeonHunterGameplay();
         }
         else if (playerGameState.playerState == PlayerState.DungeonVictim)
         {
-            DungeonVictimGameplay();
+            ServerDungeonVictimGameplay();
         }
     }
 
     #region Table Top Gameplay
-    private void TabletopGameplay()
+    [Server]
+    private void ServerTabletopGameplay()
     {
+        if (!playerGameState.playerTabletopTurn.inTurn) return;
 
+        elapsedActionTimer += Time.deltaTime;
+
+        if (elapsedActionTimer >= currentActionTime)
+        {
+            elapsedActionTimer = 0f;
+            ServerTableTopGameplayAction();
+        }
     }
+
+    [Server]
+    private void ServerTableTopGameplayAction()
+    {
+        if (playerGameState.playerTabletopTurn.finishedCursedBoxDraw) return;
+
+        GameManager.Instance.cursedBoxStation.ServerDrawCursedCard(netIdentity);
+    }
+
     #endregion
 
 
 
     #region Dungeon Gameplay
-    private void DungeonHunterGameplay()
+    [Server]
+    private void ServerDungeonHunterGameplay()
     {
 
     }
-    private void DungeonVictimGameplay()
+    [Server]
+    private void ServerDungeonVictimGameplay()
     {
 
     }

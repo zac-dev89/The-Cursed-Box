@@ -121,7 +121,6 @@ public class UIItemCarousel : NetworkBehaviour
                 continue;
             }
 
-            Debug.Log(carouselContent.name);
             GameObject tempItem = Instantiate(itemData.itemUI, carouselContent, false);
             UIItem tempItemUI = tempItem.GetComponent<UIItem>();
 

@@ -41,6 +41,11 @@ public class UIItem : MonoBehaviour
         itemCarousel = playerController.GetComponent<UIItemCarousel>();
     }
 
+
+    private void OnDisable()
+    {
+        SetPlayerHandCursor(false);
+    }
     public void SetPlayerHandCursor(bool interactable)
     {
         if (GetComponent<Button>().enabled)

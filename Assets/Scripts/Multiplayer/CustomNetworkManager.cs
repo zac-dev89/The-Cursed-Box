@@ -62,24 +62,16 @@ public class CustomNetworkManager : NetworkManager
     public override void OnServerDisconnect(NetworkConnectionToClient conn)
     {
         if (conn == null) return;
-
         if (conn.identity == null) return;
 
-        if (GameManager.Instance == null) return;
-
-        if (TabletopSpawning.Instance == null) return;
-
-        PlayerGameState targetPlayerGameState = conn.identity.GetComponent<PlayerGameState>();
-        if (targetPlayerGameState == null) return;
-
-        if (!GameManager.Instance.hasGameStarted)
+        if (SceneManager.GetActiveScene().name == "Gameplay")
         {
-            //Debug.Log("Clear Spawn");
-            TabletopSpawning.Instance.ServerRemovePlayerFromSpawn();
-            NetworkServer.DestroyPlayerForConnection(conn);
-        }
-        else
-        {
+            if (GameManager.Instance == null) return;
+            if (TabletopSpawning.Instance == null) return;
+
+            PlayerGameState targetPlayerGameState = conn.identity.GetComponent<PlayerGameState>();
+            if (targetPlayerGameState == null) return;
+
             if (targetPlayerGameState != null)
             {
                 //Debug.Log("Switch To AI Controller");
@@ -87,6 +79,12 @@ public class CustomNetworkManager : NetworkManager
                 NetworkServer.RemovePlayerForConnection(conn);
             }
         }
+        else if (SceneManager.GetActiveScene().name == "Lobby" || SceneManager.GetActiveScene().name == "TestingLobby")
+        {
+            base.OnServerDisconnect(conn);
+        }
+        
+        
         
         
     }

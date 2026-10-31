@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 public class PlayerManager : NetworkBehaviour
 {
     public static PlayerManager Instance;
-    public List<NetworkIdentity> players = new List<NetworkIdentity>();
+    public readonly SyncList<NetworkIdentity> players = new SyncList<NetworkIdentity>();
     [SyncVar] public bool allPlayersReady;
     private void Awake()
     {
@@ -22,9 +22,16 @@ public class PlayerManager : NetworkBehaviour
     public void ServerRegister(NetworkIdentity identity)
     {
         if (!NetworkServer.active) return;
+        if (players.Contains(identity)) return;
 
-        if (!players.Contains(identity))
+        if (identity.connectionToClient == NetworkServer.localConnection)
+        {
+            players.Insert(0, identity);
+        }
+        else
+        {
             players.Add(identity);
+        }
     }
     [Server]
     public void ServerUnregister(NetworkIdentity identity)

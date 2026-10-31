@@ -13,6 +13,8 @@ public static class Controls
     public static KeyCode moveLeft = KeyCode.A;
     public static KeyCode moveRight = KeyCode.D;
 
+    public static KeyCode run = KeyCode.LeftShift;
+
     // Interaction
     public static KeyCode primaryInteraction = KeyCode.E;
     public static KeyCode cursorInteraction = KeyCode.Mouse0;

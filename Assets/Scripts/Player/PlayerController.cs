@@ -9,6 +9,7 @@ public class PlayerController : NetworkBehaviour
     public Transform FPSCamera;
     public Camera camera;
     public GameplayUIHandler gameplayUIHandler;
+    public CharacterController characterController;
 
     [Header("Enabling Gameplay")]
     [SyncVar] public bool playerControllerEnabled;
@@ -54,11 +55,11 @@ public class PlayerController : NetworkBehaviour
         {
             TabletopGameplay();
         }
-        else if (playerGameState.playerState == PlayerState.DungeonHunter)
+        else if (playerGameState.playerState == PlayerState.DungeonHunter && GameManager.Instance.allDungeonPlayersReady)
         {
             DungeonHunterGameplay();
         }
-        else if (playerGameState.playerState == PlayerState.DungeonVictim)
+        else if (playerGameState.playerState == PlayerState.DungeonVictim && GameManager.Instance.allDungeonPlayersReady)
         {
             DungeonVictimGameplay();
         }
@@ -73,6 +74,7 @@ public class PlayerController : NetworkBehaviour
         Cursor.visible = false;
 
         camera.fieldOfView = tabletopFOV;
+        characterController.enabled = false;
     }
 
     #region Interaction
@@ -84,6 +86,12 @@ public class PlayerController : NetworkBehaviour
     {
         cursorInteractRay = camera.ScreenPointToRay(Input.mousePosition);
         hasCursorInteractHit = Physics.Raycast(cursorInteractRay, out cursorInteractHit);
+
+        if (!hasCursorInteractHit)
+        {
+            isCursorOnInteractable = false;
+            return;
+        }
 
         Interactable tempInteractable = cursorInteractHit.collider.GetComponent<Interactable>();
         InteractablePassOver tempInteractablePassOver = cursorInteractHit.collider.GetComponent<InteractablePassOver>();
@@ -141,6 +149,61 @@ public class PlayerController : NetworkBehaviour
     #endregion
 
 
+    #region Camera Focusing
+    private Coroutine focusingCorutine;
+    private bool inFocusingTransition;
+
+    public void FocusAtPoint(Transform lookAtPT, float zoom, float duration)
+    {
+        Quaternion lookRot = Quaternion.LookRotation((lookAtPT.position - FPSCamera.transform.position).normalized);
+
+        if (focusingCorutine != null) StopCoroutine(focusingCorutine);
+        focusingCorutine = StartCoroutine(PlayerCameraFocusing(lookRot, zoom, duration, false));
+    }
+    public void LerpCameraRotation(Quaternion lookAtRot, float zoom, float duration)
+    {
+        if (focusingCorutine != null) StopCoroutine(focusingCorutine);
+        focusingCorutine = StartCoroutine(PlayerCameraFocusing(lookAtRot, zoom, duration, true));
+    }
+    public void ExitFocus(float duration)
+    {
+        if (focusingCorutine != null) StopCoroutine(focusingCorutine);
+        focusingCorutine = StartCoroutine(PlayerCameraFocusing(transform.rotation, tabletopFOV, duration, false));
+    }
+
+    IEnumerator PlayerCameraFocusing(Quaternion targetRot, float targetFOV, float duration, bool isLocalRot)
+    {
+        float elapsedTime = 0f;
+        Quaternion initialRot = FPSCamera.rotation;
+        float initialFOV = camera.fieldOfView;
+
+        inFocusingTransition = true;
+
+        while (elapsedTime < duration)
+        {
+            elapsedTime += Time.deltaTime;
+
+            float t = Mathf.Clamp01(elapsedTime / duration);
+
+            // Exponential Ease Out
+            float smoothT = t >= 1f ? 1f : 1f - Mathf.Pow(2f, -10f * t);
+
+            if (!isLocalRot) FPSCamera.rotation = Quaternion.Slerp(initialRot, targetRot, smoothT);
+            else FPSCamera.localRotation = Quaternion.Slerp(initialRot, targetRot, smoothT);
+
+            camera.fieldOfView = Mathf.Lerp(initialFOV, targetFOV, smoothT);
+
+            yield return null;
+        }
+
+        inFocusingTransition = false;
+
+        // Ensure exact final values
+        FPSCamera.rotation = targetRot;
+        camera.fieldOfView = targetFOV;
+    }
+
+    #endregion
 
     #region Table Top Gameplay
 
@@ -149,18 +212,13 @@ public class PlayerController : NetworkBehaviour
     public float tabletopFocusFOV = 50f;
 
     [Space]
-    public float cameraTiltAngle = 3f;
+    public float tabletopCameraTiltAngle = 3f;
 
-    [Space]
-
-    private Coroutine tabletopFocusingCorutine;
-    private bool inTabletopFocusingTransition;
-
-    private float tabletopLookX;
-    private float tabletopLookY;
 
     public void OnPlayerTabletopTurn(PlayerTabletopTurn tabletopTurn)
     {
+        if (playerGameState.playerState == PlayerState.DungeonVictim || playerGameState.playerState == PlayerState.DungeonHunter) return;
+
         PlayerTabletopState tabletopState = tabletopTurn.playerTabletopState;
 
         if (tabletopState == PlayerTabletopState.Itembox)
@@ -168,12 +226,13 @@ public class PlayerController : NetworkBehaviour
             if (tabletopTurn.inItemBoxInsertMode)
             {
                 gameplayUIHandler.ToggleAddBloodPackPanel();
-                FocusOnInteractable(GameManager.Instance.cursedBoxStation.insertItemBoxItemTrigger.transform, 30f, .5f);
+                gameplayUIHandler.UpdateItemBoxItemsUI();
+                FocusAtPoint(GameManager.Instance.cursedBoxStation.insertItemBoxItemTrigger.transform, 30f, .5f);
             }
             else
             {
                 gameplayUIHandler.HideAllPanels(gameplayUIHandler.itemboxUIPanels);
-                FocusOnInteractable(GameManager.Instance.cursedBoxStation.itemBox.transform, 40f, .5f);
+                FocusAtPoint(GameManager.Instance.cursedBoxStation.itemBox.transform, 40f, .5f);
             }
 
             gameplayUIHandler.ToggleItemBoxPanel();
@@ -183,25 +242,37 @@ public class PlayerController : NetworkBehaviour
         }
         else if (tabletopState == PlayerTabletopState.Cursedbox)
         {
-            if (tabletopTurn.inCursedBoxInsertMode)
+            if (tabletopTurn.inCursedBoxInsertMode && !tabletopTurn.peekingAtBox)
             {
                 gameplayUIHandler.ToggleAddItemsPanel();
-                FocusOnInteractable(GameManager.Instance.cursedBoxStation.insertCursedBoxItemTrigger.transform, 30f, .5f);
+                gameplayUIHandler.UpdateCursedBoxItemsUI();
+                FocusAtPoint(GameManager.Instance.cursedBoxStation.insertCursedBoxItemTrigger.transform, 30f, .5f);
+
+                Cursor.lockState = CursorLockMode.Confined;
+                Cursor.visible = true;
+            }
+            else if (tabletopTurn.peekingAtBox)
+            {
+                gameplayUIHandler.HideAllPanels(gameplayUIHandler.cursedboxUIPanels);
+                FocusAtPoint(GameManager.Instance.cursedBoxStation.peekInsideCursedBox.transform, 25f, .5f);
+
+                Cursor.lockState = CursorLockMode.Confined;
+                Cursor.visible = false;
             }
             else
             {
                 gameplayUIHandler.HideAllPanels(gameplayUIHandler.cursedboxUIPanels);
-                FocusOnInteractable(GameManager.Instance.cursedBoxStation.cursedBox.transform, 40f, .5f);
+                FocusAtPoint(GameManager.Instance.cursedBoxStation.cursedBox.transform, 40f, .5f);
+
+                Cursor.lockState = CursorLockMode.Confined;
+                Cursor.visible = true;
             }
 
-            gameplayUIHandler.ToggleCursedBoxPanel();
-
-            Cursor.lockState = CursorLockMode.Confined;
-            Cursor.visible = true;
+            gameplayUIHandler.ToggleCursedBoxPanel();         
         }
         else
         {
-            ExitFocusOnInteractable(.5f);
+            ExitFocus(.5f);
             gameplayUIHandler.ToggleNonTabletopTurnPanel();
 
             Cursor.lockState = CursorLockMode.Locked;
@@ -224,7 +295,7 @@ public class PlayerController : NetworkBehaviour
             }
 
         }
-        else if (!inTabletopFocusingTransition)
+        else if (!inFocusingTransition)
         {
             TabletopLooking();
         }
@@ -254,7 +325,7 @@ public class PlayerController : NetworkBehaviour
     {
         PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
 
-        if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemBoxInsertMode && !playerTabletopTurn.hasUsedItemBoxItem)
+        if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemBoxInsertMode && !playerTabletopTurn.hasUsedItemBoxItem && !playerTabletopTurn.inInteractionCooldown)
         {
             CmdTryExitBloodPackMode();
         }
@@ -265,7 +336,7 @@ public class PlayerController : NetworkBehaviour
     {
         PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
 
-        if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemBoxInsertMode && !playerTabletopTurn.hasUsedItemBoxItem)
+        if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemBoxInsertMode && !playerTabletopTurn.hasUsedItemBoxItem && !playerTabletopTurn.inInteractionCooldown)
         {
             GameManager.Instance.cursedBoxStation.ServerExitBloodPackMode(this.netIdentity);
         }
@@ -291,7 +362,7 @@ public class PlayerController : NetworkBehaviour
     {
         PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
 
-        if (playerTabletopTurn.inTurn && playerTabletopTurn.inCursedBoxInsertMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.specialItemsCap)
+        if (playerTabletopTurn.inTurn && playerTabletopTurn.inCursedBoxInsertMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.cursedBoxItemsCap && !playerTabletopTurn.inInteractionCooldown)
         {
             CmdTryExitItemCardMode();
         }
@@ -302,7 +373,7 @@ public class PlayerController : NetworkBehaviour
     {
         PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
 
-        if (playerTabletopTurn.inTurn && playerTabletopTurn.inCursedBoxInsertMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.specialItemsCap)
+        if (playerTabletopTurn.inTurn && playerTabletopTurn.inCursedBoxInsertMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.cursedBoxItemsCap && !playerTabletopTurn.inInteractionCooldown)
         {
             GameManager.Instance.cursedBoxStation.ServerExitItemCardMode(this.netIdentity);
         }
@@ -314,14 +385,21 @@ public class PlayerController : NetworkBehaviour
     float currentCameraTilt = 0f;
     public void TabletopLooking()
     {
-        // Look Around
-        tabletopLookX += Input.GetAxis("Mouse X") * Controls.sensX;
-        tabletopLookY += Input.GetAxis("Mouse Y") * Controls.sensY;
+        // Get the actual camera rotation
+        Vector3 lookRot = FPSCamera.localEulerAngles;
 
-        tabletopLookY = Mathf.Clamp(tabletopLookY, -60f, 60f);
-        tabletopLookX = Mathf.Clamp(tabletopLookX, -80f, 80f);
+        // Convert Unity's 0-360 angles into -180 to 180
+        lookRot.x = Mathf.DeltaAngle(0f, lookRot.x);
+        lookRot.y = Mathf.DeltaAngle(0f, lookRot.y);
 
-        Vector3 lookRot = new Vector3(-tabletopLookY, tabletopLookX, 0f);
+        // Apply mouse input to the current camera rotation
+        lookRot.x -= Input.GetAxis("Mouse Y") * Controls.sensY;
+        lookRot.y += Input.GetAxis("Mouse X") * Controls.sensX;
+
+        // Clamp pitch and yaw
+        lookRot.x = Mathf.Clamp(lookRot.x, -60f, 60f);
+        lookRot.y = Mathf.Clamp(lookRot.y, -80f, 80f);
+
 
         // Focusing
         float currentCameraFOV = camera.fieldOfView;
@@ -330,70 +408,209 @@ public class PlayerController : NetworkBehaviour
 
         // Camera Tilt
         float targetCamTilt = 0f;
-        if (Input.GetAxis("Mouse X") > 0) targetCamTilt = cameraTiltAngle;
-        else if (Input.GetAxis("Mouse X") < 0) targetCamTilt = -cameraTiltAngle;
+        if (Input.GetAxis("Mouse X") > 0) targetCamTilt = tabletopCameraTiltAngle;
+        else if (Input.GetAxis("Mouse X") < 0) targetCamTilt = -tabletopCameraTiltAngle;
 
         currentCameraTilt = Mathf.Lerp(currentCameraTilt, targetCamTilt, 10f * Time.deltaTime);
 
-
-        FPSCamera.transform.localRotation = Quaternion.Euler(lookRot + new Vector3(0,0,currentCameraTilt));
+        // Preserve your camera tilt
+        FPSCamera.localRotation = Quaternion.Euler(
+            lookRot.x,
+            lookRot.y,
+            currentCameraTilt
+        );
     }
 
+    #endregion
 
-    // Focusing on interactables
-    public void FocusOnInteractable(Transform lookAtPT, float zoom, float duration)
+
+
+    #region Dungeon Victim Gameplay
+    [Header("Dungeon Victim Movement")]
+    public float dungeonVictimFOV = 70f;
+    public float dungeonVictimFocusFOV = 50f;
+    public float dungeonVictimCameraTiltAngle = 4f;
+
+    [Space]
+
+    public float dungeonVictimWalkSpeed = 5f;
+    public float dungeonVictimRunSpeed = 7.5f;
+    private float dungeonVictimMoveSpeed = 0f;
+
+
+    [Space]
+
+    public float dungeonVictimAcceleration = 12f;
+    public float dungeonVictimDeceleration = 16f;
+    public float dungeonVictimGravity = -20f;
+    private Vector3 inputDirection;
+    private Vector3 dungeonVictimVelocity;
+
+
+    public void OnDungeonVictimStarted()
     {
-        Quaternion lookRot = Quaternion.LookRotation((lookAtPT.position - FPSCamera.transform.position).normalized);
+        dungeonVictimMoveSpeed = dungeonVictimWalkSpeed;
+        characterController.enabled = true;
 
-        if (tabletopFocusingCorutine != null) StopCoroutine(tabletopFocusingCorutine);
-        tabletopFocusingCorutine = StartCoroutine(PlayerTabletopFocusing(lookRot, zoom, duration));
+        if (focusingCorutine != null) StopCoroutine(focusingCorutine);
+        LerpCameraRotation(Quaternion.Euler(0,0,0), dungeonVictimFOV, .5f);
+
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
     }
-    public void ExitFocusOnInteractable(float duration)
-    {
-        tabletopLookX = 0f;
-        tabletopLookY = 0f;
 
-        if (tabletopFocusingCorutine != null) StopCoroutine(tabletopFocusingCorutine);
-        tabletopFocusingCorutine = StartCoroutine(PlayerTabletopFocusing(transform.rotation, tabletopFOV, duration));
+    private void DungeonVictimGameplay()
+    {
+        if (IsDungeonVictimFrozen()) return;
+
+        DungeonVictimLooking();
+        DungeonVictimMovementSpeed();
+        DungeonVictimMovement();
+        DungeonVictimInteraction();
+
+
+
     }
-
-    IEnumerator PlayerTabletopFocusing(Quaternion targetRot, float targetFOV, float duration)
+    private void DungeonVictimLooking()
     {
-        float elapsedTime = 0f;
-        Quaternion initialRot = FPSCamera.rotation;
-        float initialFOV = camera.fieldOfView;
+        float mouseX = Input.GetAxis("Mouse X");
+        float mouseY = Input.GetAxis("Mouse Y");
 
-        inTabletopFocusingTransition = true;
+        // Get current camera rotation
+        Vector3 lookRot = FPSCamera.localEulerAngles;
 
-        while (elapsedTime < duration)
+        lookRot.x = Mathf.DeltaAngle(0f, lookRot.x);
+        lookRot.y = Mathf.DeltaAngle(0f, lookRot.y);
+
+        // Apply mouse input
+        lookRot.x -= mouseY * Controls.sensY;
+        lookRot.y += mouseX * Controls.sensX;
+
+        // Clamp pitch
+        lookRot.x = Mathf.Clamp(lookRot.x, -80f, 80f);
+
+        // Transfer camera yaw to player
+        float playerYaw = transform.eulerAngles.y + lookRot.y;
+
+        transform.rotation = Quaternion.Euler(0f, playerYaw, 0f);
+
+        // Focus
+        float targetFOV = Input.GetKey(Controls.focus)
+            ? dungeonVictimFocusFOV
+            : dungeonVictimFOV;
+
+        camera.fieldOfView = Mathf.Lerp(
+            camera.fieldOfView,
+            targetFOV,
+            15f * Time.deltaTime
+        );
+
+        // Camera tilt
+        float targetCamTilt = 0f;
+
+        if (mouseX > 0f)
+            targetCamTilt = dungeonVictimCameraTiltAngle;
+        else if (mouseX < 0f)
+            targetCamTilt = -dungeonVictimCameraTiltAngle;
+
+        currentCameraTilt = Mathf.Lerp(
+            currentCameraTilt,
+            targetCamTilt,
+            10f * Time.deltaTime
+        );
+
+        // Reset local yaw after transferring it to the player
+        FPSCamera.localRotation = Quaternion.Euler(
+            lookRot.x,
+            0f,
+            0f // currentCameraTilt
+        );
+    }
+    private void DungeonVictimMovementSpeed()
+    {
+        bool movingStraight = Vector3.Angle(inputDirection.normalized, transform.forward) < 90f;
+
+        //Debug.Log($"Run Key Down: {Input.GetKey(Controls.run)} || Velocity > 0: {dungeonVictimVelocity.magnitude > 2f} || Is Moving Straight {movingStraight}");
+
+        if (Input.GetKey(Controls.run) && dungeonVictimVelocity.magnitude > 2f && movingStraight)
         {
-            elapsedTime += Time.deltaTime;
+            dungeonVictimMoveSpeed = dungeonVictimRunSpeed;
+        }
+        else
+        {
+            dungeonVictimMoveSpeed = dungeonVictimWalkSpeed;
+        }
+    }
+    private void DungeonVictimMovement()
+    {
+        float inputX = Input.GetAxisRaw("Horizontal");
+        float inputZ = Input.GetAxisRaw("Vertical");
 
-            float t = Mathf.Clamp01(elapsedTime / duration);
+        // Get movement direction relative to player facing.
+        inputDirection = transform.right * inputX
+                               + transform.forward * inputZ;
 
-            // Exponential Ease Out
-            float smoothT = t >= 1f ? 1f : 1f - Mathf.Pow(2f, -10f * t);
+        inputDirection = Vector3.ClampMagnitude(inputDirection, 1f);
 
-            FPSCamera.rotation = Quaternion.Slerp(initialRot, targetRot, smoothT);
-            camera.fieldOfView = Mathf.Lerp(initialFOV, targetFOV, smoothT);
+        // Current horizontal velocity.
+        Vector3 currentHorizontalVelocity = new Vector3(
+            dungeonVictimVelocity.x,
+            0f,
+            dungeonVictimVelocity.z
+        );
 
-            yield return null;
+        // Desired horizontal velocity.
+        Vector3 targetHorizontalVelocity =
+            inputDirection * dungeonVictimMoveSpeed;
+
+        // Use separate acceleration and stopping speeds.
+        float acceleration = inputDirection.sqrMagnitude > 0.01f
+            ? dungeonVictimAcceleration
+            : dungeonVictimDeceleration;
+
+        // Smooth velocity directly toward the target.
+        Vector3 newHorizontalVelocity = Vector3.MoveTowards(
+            currentHorizontalVelocity,
+            targetHorizontalVelocity,
+            acceleration * Time.deltaTime
+        );
+
+        dungeonVictimVelocity.x = newHorizontalVelocity.x;
+        dungeonVictimVelocity.z = newHorizontalVelocity.z;
+
+        // Gravity.
+        if (characterController.isGrounded && dungeonVictimVelocity.y < 0f)
+        {
+            dungeonVictimVelocity.y = -2f;
+        }
+        else
+        {
+            dungeonVictimVelocity.y += dungeonVictimGravity * Time.deltaTime;
         }
 
-        inTabletopFocusingTransition = false;
+        // Apply movement.
+        characterController.Move(
+            dungeonVictimVelocity * Time.deltaTime
+        );
+    }
+    private void DungeonVictimInteraction()
+    {
+        if (Input.GetKeyDown(Controls.primaryInteraction) && hasInteractHit)
+        {
+            TryInteract(interactHit, FPSCamera.position, FPSCamera.forward);
+        }
+    }
 
-        // Ensure exact final values
-        FPSCamera.rotation = targetRot;
-        camera.fieldOfView = targetFOV;
+    private bool IsDungeonVictimFrozen()
+    {
+        return playerGameState.isMovingThroughGap || !playerGameState.isAlive;
     }
     #endregion
 
-    #region Dungeon Gameplay
-    private void DungeonHunterGameplay()
-    {
 
-    }
-    private void DungeonVictimGameplay()
+
+    #region Dungeon Hunter Gameplay
+    private void DungeonHunterGameplay()
     {
 
     }

@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
 using Mirror;
 
 public class TabletopSpawning : NetworkBehaviour
@@ -6,7 +8,7 @@ public class TabletopSpawning : NetworkBehaviour
     public static TabletopSpawning Instance;
 
     [Header("Tabletop Spawn Points")]
-    public Transform[] spawnPoints;
+    public List<Transform> spawnPoints;
     public int playerSpawnIndex = 0;
 
     private void Awake()
