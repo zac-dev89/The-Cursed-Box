@@ -31824,7 +31824,7 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
-  spawnPoints:
+  seatsPoints:
   - {fileID: 1271441609}
   - {fileID: 14284930}
   - {fileID: 1522267078}

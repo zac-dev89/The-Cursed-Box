@@ -1315,6 +1315,7 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
+  playerGameState: {fileID: 2960502634740177594}
   isReady: 0
 --- !u!114 &871520129997148454
 MonoBehaviour:
@@ -1393,6 +1394,7 @@ MonoBehaviour:
   flashLight: {fileID: 5730626825779158960}
   playerType: 0
   playerStartedInGame: 0
+  tabletopSeatIndex: -1
   playerState: 0
   isAlive: 0
   botMaterial: {fileID: 2100000, guid: a2f9cdc995d68e840ae8e5572be841ef, type: 2}

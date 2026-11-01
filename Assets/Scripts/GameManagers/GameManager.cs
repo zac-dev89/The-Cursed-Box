@@ -87,8 +87,7 @@ public class GameManager : NetworkBehaviour
     {
         for (int i = 0; i < num; i++)
         {
-            Transform seatSpawn = TabletopSpawning.Instance.ServerAddPlayerFromSpawn();
-            GameObject bot = Instantiate(botPlayerPrefab, seatSpawn.position, seatSpawn.rotation);
+            GameObject bot = Instantiate(botPlayerPrefab);
             NetworkServer.Spawn(bot);
 
             PlayerGameState botGameState = bot.GetComponent<PlayerGameState>();

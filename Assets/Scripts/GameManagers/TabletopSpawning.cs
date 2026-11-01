@@ -8,8 +8,8 @@ public class TabletopSpawning : NetworkBehaviour
     public static TabletopSpawning Instance;
 
     [Header("Tabletop Spawn Points")]
-    public List<Transform> spawnPoints;
-    public int playerSpawnIndex = 0;
+    public List<Transform> seatsPoints;
+    private int nonHostPlayerSpawnIndex = 1;
 
     private void Awake()
     {
@@ -21,16 +21,23 @@ public class TabletopSpawning : NetworkBehaviour
 
 
     [Server]
-    public Transform ServerAddPlayerFromSpawn()
+    public void ServerAddPlayerForSpawn(NetworkIdentity player, bool isHost)
     {
-        Transform spawnPT = spawnPoints[playerSpawnIndex];
-        playerSpawnIndex++;
-        return spawnPT;
+        PlayerGameState PGS = player.GetComponent<PlayerGameState>();
+
+        if (isHost)
+        {
+            PGS.tabletopSeatIndex = 0;
+        }
+        else
+        {
+            PGS.tabletopSeatIndex = nonHostPlayerSpawnIndex;
+            nonHostPlayerSpawnIndex++;
+        }
+    }
+    public Transform GetSeatFromIndex(int index)
+    {
+        return seatsPoints[index];
     }
 
-    [Server]
-    public void ServerRemovePlayerFromSpawn()
-    {
-        playerSpawnIndex--;
-    }
 }

@@ -67,6 +67,7 @@ public class PlayerGameState : NetworkBehaviour
 
 
     [Header("Game States")]
+    [SyncVar(hook = nameof(OnTableTopSeatInitialized))] public int tabletopSeatIndex = -1;
     [SyncVar] public PlayerState playerState;
     [SyncVar] public bool isAlive;
 
@@ -126,6 +127,15 @@ public class PlayerGameState : NetworkBehaviour
         flashLight.enabled = false;
     }
 
+    void OnTableTopSeatInitialized(int oldValue, int newValue)
+    {
+        Transform seat = TabletopSpawning.Instance.GetSeatFromIndex(newValue);
+
+
+        Debug.Log($"Seat Index is {newValue}");
+        transform.position = seat.position;
+        transform.rotation = seat.rotation;
+    }
 
     #endregion
 
@@ -228,7 +238,6 @@ public class PlayerGameState : NetworkBehaviour
     #region Tabletop Gameplay
     [Header("Tabletop Gameplay")]
     [SyncVar(hook = nameof(OnTabletopTurn))] public PlayerTabletopTurn playerTabletopTurn;
-
 
     public int tabletopLives = 4;
     [SyncVar(hook = nameof(OnTabletopLivesChanged))] public int currentTabletopLives;
@@ -469,7 +478,6 @@ public class PlayerGameState : NetworkBehaviour
     public bool isDungeonPlayerReady;
 
 
-
     #region Dungeon Victim Gameplay
 
     [Header("Dungeon Victim Gameplay")]
@@ -522,7 +530,12 @@ public class PlayerGameState : NetworkBehaviour
     public void RpcMoveThroughGap(Vector3 facingDirection, Vector3 gapEntrance, string gapAnimation)
     {
         isMovingThroughGap = true;
-        if (isLocalPlayer && playerType == PlayerType.PlayerControlled) playerController.characterController.enabled = false;
+
+        if (isLocalPlayer && playerType == PlayerType.PlayerControlled)
+        {
+            playerController.characterController.enabled = false;
+            playerController.dungeonVictimVelocity = Vector3.zero;
+        }
 
         StartCoroutine(MoveThroughGap(facingDirection, gapEntrance, gapAnimation));
     }

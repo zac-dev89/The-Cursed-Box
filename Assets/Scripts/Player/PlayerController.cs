@@ -444,7 +444,7 @@ public class PlayerController : NetworkBehaviour
     public float dungeonVictimDeceleration = 16f;
     public float dungeonVictimGravity = -20f;
     private Vector3 inputDirection;
-    private Vector3 dungeonVictimVelocity;
+    public Vector3 dungeonVictimVelocity;
 
 
     public void OnDungeonVictimStarted()

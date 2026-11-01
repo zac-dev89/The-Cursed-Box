@@ -19,19 +19,23 @@ public class PlayerManager : NetworkBehaviour
 
     #region Initializing Players
     [Server]
-    public void ServerRegister(NetworkIdentity identity)
+    public void ServerRegister(NetworkIdentity player)
     {
         if (!NetworkServer.active) return;
-        if (players.Contains(identity)) return;
+        if (players.Contains(player)) return;
 
-        if (identity.connectionToClient == NetworkServer.localConnection)
+        if (player.connectionToClient == NetworkServer.localConnection)
         {
-            players.Insert(0, identity);
+            players.Insert(0, player);
+            TabletopSpawning.Instance.ServerAddPlayerForSpawn(player, true);
         }
         else
         {
-            players.Add(identity);
+            players.Add(player);
+            TabletopSpawning.Instance.ServerAddPlayerForSpawn(player, false);
         }
+
+        
     }
     [Server]
     public void ServerUnregister(NetworkIdentity identity)

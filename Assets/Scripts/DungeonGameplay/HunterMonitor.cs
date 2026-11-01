@@ -6,6 +6,11 @@ public class HunterMonitor : MonoBehaviour
 {
     public List<GameObject> monitorMeshes;
 
+    private void Start()
+    {
+        ShouldShowMonitor(false);
+    }
+
     public void ShouldShowMonitor(bool show)
     {
         for (int i = 0; i < monitorMeshes.Count; i++)

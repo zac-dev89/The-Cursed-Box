@@ -5,9 +5,10 @@ using System.Collections.Generic;
 
 public class PlayerRegistration : NetworkBehaviour
 {
+    public PlayerGameState playerGameState;
+
     private bool sentReady;
     public bool isReady;
-
 
     public override void OnStartServer()
     {
@@ -30,7 +31,7 @@ public class PlayerRegistration : NetworkBehaviour
 
     IEnumerator WaitForLoadIn()
     {
-        while (!Physics.Raycast(transform.position, Vector3.down, 10f))
+        while (!Physics.Raycast(transform.position, Vector3.down, 10f) || playerGameState.tabletopSeatIndex == -1)
         {
             yield return null;
         }

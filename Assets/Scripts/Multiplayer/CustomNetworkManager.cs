@@ -1,6 +1,7 @@
+using Mirror;
+using System.Security.Principal;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using Mirror;
 
 
 public class CustomNetworkManager : NetworkManager
@@ -39,10 +40,8 @@ public class CustomNetworkManager : NetworkManager
         {
             TabletopSpawning tabletopSpawning = FindAnyObjectByType<TabletopSpawning>();
 
-            Transform startPos = tabletopSpawning.ServerAddPlayerFromSpawn();
-            GameObject player = startPos != null
-                ? Instantiate(playerPrefab, startPos.position, startPos.rotation)
-                : Instantiate(playerPrefab);
+            bool isHost = conn == NetworkServer.localConnection;
+            GameObject player = Instantiate(playerPrefab);
 
             player.name = $"{playerPrefab.name} [connId={conn.connectionId}]";
 
