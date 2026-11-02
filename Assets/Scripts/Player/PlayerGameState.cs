@@ -45,6 +45,16 @@ public struct PlayerTabletopTurn
     public bool peekingAtBox;
 }
 
+[System.Serializable]
+public struct PlayerDungeonHunter
+{
+    public NetworkIdentity dungeonHunter;
+    public NetworkIdentity dungeonHunterMonitor;
+
+    public Vector3 hunterSpawnPOS;
+    public Quaternion hunterSpawnROT;
+}
+
 
 public class PlayerGameState : NetworkBehaviour
 {
@@ -279,7 +289,7 @@ public class PlayerGameState : NetworkBehaviour
         }
         else
         {
-            GameManager.Instance.ServerInitializeDungeon(netIdentity);
+            GameManager.Instance.ServerDeployVictimIntoDungeon(netIdentity);
         }
     }
     [Server]
@@ -474,8 +484,6 @@ public class PlayerGameState : NetworkBehaviour
 
 
     #region Dungeon Gameplay
-    [Header("Dungeon Gameplay")]
-    public bool isDungeonPlayerReady;
 
 
     #region Dungeon Victim Gameplay
@@ -485,6 +493,7 @@ public class PlayerGameState : NetworkBehaviour
     float initialGapTransitionTime = 0.25f;
     public float wallGapMoveTime;
     public float crawlSpaceGapMoveTime;
+    public bool isDungeonVictimReady;
 
     [Space]
     private NetworkIdentity SERVER_CurrentGap; 
@@ -509,13 +518,27 @@ public class PlayerGameState : NetworkBehaviour
         if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
         {
             playerController.OnDungeonVictimStarted();
-            CmdReportReadyInDungeon();
+            CmdReportVictimReadyInDungeon();
         }
         else if (playerType == PlayerType.AIControlled && NetworkServer.active)
         {
-            ServerReportReadyInDungeon();
+            ServerReportVictimReadyInDungeon();
         }
     }
+    [Command]
+    private void CmdReportVictimReadyInDungeon()
+    {
+        isDungeonVictimReady = true;
+        GameManager.Instance.ServerDeployHuntersIntoDungeon();
+    }
+    [Server]
+    private void ServerReportVictimReadyInDungeon()
+    {
+        isDungeonVictimReady = true;
+        GameManager.Instance.ServerDeployHuntersIntoDungeon();
+    }
+
+
 
     // Gap Traversal
 
@@ -589,40 +612,54 @@ public class PlayerGameState : NetworkBehaviour
 
     #region Dungeon Hunter Gameplay
 
+    [Header("Dungeon Hunter Gameplay")]
+    public bool isDungeonHunterReady;
+    [SyncVar(hook = nameof(OnPlayerDungeonHunterChanged))] public PlayerDungeonHunter playerDungeonHunter; 
+
     [Server]
-    public void ServerSpawnHunterInDungeon(Vector3 spawnPosition, Quaternion spawnRotation)
+    public void ServerSpawnHunterInDungeon(PlayerDungeonHunter dungeonHunterData)
     {
         playerState = PlayerState.DungeonHunter;
-        RpcSpawnHunterInDungeon(spawnPosition, spawnRotation);
+        playerDungeonHunter = dungeonHunterData;
+
+        RpcSpawnHunterInDungeon(dungeonHunterData);
     }
     [ClientRpc]
-    private void RpcSpawnHunterInDungeon(Vector3 spawnPosition, Quaternion spawnRotation)
+    public void RpcSpawnHunterInDungeon(PlayerDungeonHunter dungeonHunterData)
     {
-        // Dungeon Hunter is spawned in and ready
-
         playerState = PlayerState.DungeonHunter;
-        if (playerType == PlayerType.PlayerControlled && isLocalPlayer) 
+        playerDungeonHunter = dungeonHunterData;
+        
+        HunterMonitor hunterMonitor = dungeonHunterData.dungeonHunterMonitor.GetComponent<HunterMonitor>();
+        hunterMonitor.ShouldShowMonitor(true);
+
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
         {
-            CmdReportReadyInDungeon();
+            CmdReportHunterReadyInDungeon();
         }
         else if (playerType == PlayerType.AIControlled && NetworkServer.active)
         {
-            ServerReportReadyInDungeon();
+            ServerReportHunterReadyInDungeon();
         }
     }
+
     [Command]
-    private void CmdReportReadyInDungeon()
+    private void CmdReportHunterReadyInDungeon()
     {
-        isDungeonPlayerReady = true;
-        GameManager.Instance.ServerCheckAllPlayersReadyInDungeon();
+        isDungeonHunterReady = true;
+        GameManager.Instance.ServerCheckAllDungeonPlayersSetUp();
     }
     [Server]
-    private void ServerReportReadyInDungeon()
+    private void ServerReportHunterReadyInDungeon()
     {
-        isDungeonPlayerReady = true;
-        GameManager.Instance.ServerCheckAllPlayersReadyInDungeon();
+        isDungeonHunterReady = true;
+        GameManager.Instance.ServerCheckAllDungeonPlayersSetUp();
     }
 
+    private void OnPlayerDungeonHunterChanged(PlayerDungeonHunter oldValue, PlayerDungeonHunter newValue)
+    {
+        
+    }
 
     #endregion
 

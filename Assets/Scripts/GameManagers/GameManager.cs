@@ -170,57 +170,74 @@ public class GameManager : NetworkBehaviour
 
     #region Dungeon Gameplay
     [SyncVar] public bool allDungeonPlayersReady;
+    List<Transform> curr_DungeonSpawnPTs = new List<Transform>();
+    NetworkIdentity curr_DungeonVictim;
 
     [Server]
-    public void ServerInitializeDungeon(NetworkIdentity dungeonVictim)
+    public void ServerDeployVictimIntoDungeon(NetworkIdentity dungeonVictim)
     {
-        List<Transform> dungeonSpawnPTs = DungeonSpawning.Instance.GetDungeonSpawnPTs();
+        curr_DungeonSpawnPTs.Clear();
+        curr_DungeonSpawnPTs = DungeonSpawning.Instance.GetDungeonSpawnPTs();
 
         allDungeonPlayersReady = false;
 
-        int huntersIndex = 0;
-        for (int i = 0; i < PlayerManager.Instance.players.Count; i++)
-        {
-            NetworkIdentity tempPlayer = PlayerManager.Instance.players[i];
-            PlayerGameState tempPGS = tempPlayer.GetComponent<PlayerGameState>();
+        curr_DungeonVictim = dungeonVictim;
+        PlayerGameState tempPGS = dungeonVictim.GetComponent<PlayerGameState>();
 
-            tempPGS.ServerEndPlayerTurn();
-
-            if (tempPlayer == dungeonVictim)
-            {
-                tempPGS.ServerSpawnVictimInDungeon(dungeonSpawnPTs[0].position, dungeonSpawnPTs[0].rotation);
-            }
-            else
-            {
-                huntersIndex++;
-                tempPGS.ServerSpawnHunterInDungeon(dungeonSpawnPTs[huntersIndex].position, dungeonSpawnPTs[huntersIndex].rotation);
-            }
-        }
-
+        tempPGS.ServerEndPlayerTurn();
+        tempPGS.ServerSpawnVictimInDungeon(curr_DungeonSpawnPTs[0].position, curr_DungeonSpawnPTs[0].rotation);
+        
         cursedBoxStation.ServerHideCursedBoxStation();
     }
 
+    [Server]
+    public void ServerDeployHuntersIntoDungeon()
+    {
+        Debug.Log("Hunters Must Be Deployed!");
+        int hunterSpawnPTIndex = 1;
+        int hunterIndex = 0;
 
+        foreach (NetworkIdentity hunter in PlayerManager.Instance.players)
+        {
+            if (hunter != curr_DungeonVictim)
+            { 
+                PlayerGameState hunterPGS = hunter.GetComponent<PlayerGameState>();
+
+                PlayerDungeonHunter tempPDH = new PlayerDungeonHunter();
+                
+                tempPDH.dungeonHunterMonitor = dungeonHunterMonitors[PlayerManager.Instance.players.IndexOf(hunter)];
+                tempPDH.dungeonHunter = dungeonHunters[hunterIndex];
+                tempPDH.hunterSpawnPOS = curr_DungeonSpawnPTs[hunterSpawnPTIndex].position;
+                tempPDH.hunterSpawnROT = curr_DungeonSpawnPTs[hunterSpawnPTIndex].rotation;
+
+                hunterPGS.ServerSpawnHunterInDungeon(tempPDH);
+
+                hunterIndex++;
+                hunterSpawnPTIndex++;
+            }
+        }
+    }
 
     [Server]
-    public void ServerCheckAllPlayersReadyInDungeon()
+    public void ServerCheckAllDungeonPlayersSetUp()
     {
-        if (!NetworkServer.active) return;
+        Debug.Log("Check Dungeon Hunter Players Ready");
 
-        foreach (NetworkIdentity id in PlayerManager.Instance.players)
+        foreach (NetworkIdentity hunter in PlayerManager.Instance.players)
         {
-            if (id == null) return;
+            PlayerGameState hunterPGS = hunter.GetComponent<PlayerGameState>();
 
-            PlayerGameState PGS = id.GetComponent<PlayerGameState>();
-            if (PGS == null || !PGS.isDungeonPlayerReady)
+            if (hunterPGS.playerState == PlayerState.DungeonHunter && !hunterPGS.isDungeonHunterReady)
             {
                 return;
             }
-        }
+            
 
-        allDungeonPlayersReady = true;
-        ServerStartDungeonGameplay();
+            allDungeonPlayersReady = true;
+            ServerStartDungeonGameplay();
+        }
     }
+
 
     [Server]
     private void ServerStartDungeonGameplay()
