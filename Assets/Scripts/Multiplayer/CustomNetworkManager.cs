@@ -75,6 +75,15 @@ public class CustomNetworkManager : NetworkManager
             {
                 //Debug.Log("Switch To AI Controller");
                 targetPlayerGameState.ServerSwitchToAIController();
+
+                NetworkIdentity temp_Hunter = targetPlayerGameState.entirePlayerState.playerDungeonHunterData.dungeonHunter;
+                if (temp_Hunter != null)
+                {
+                    Debug.Log("Remove authority on hunter");
+                    temp_Hunter.RemoveClientAuthority();
+                }
+
+
                 NetworkServer.RemovePlayerForConnection(conn);
             }
         }

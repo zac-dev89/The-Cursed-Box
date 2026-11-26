@@ -43,7 +43,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 0
-  m_Color: {r: 0.7169812, g: 0.44304025, b: 0.44304025, a: 1}
+  m_Color: {r: 0.5, g: 0, b: 0, a: 1}
   m_Intensity: 1889.207
   m_Range: 11.73
   m_SpotAngle: 62.180794
@@ -251,6 +251,7 @@ GameObject:
   - component: {fileID: 8521058632941351093}
   - component: {fileID: 6751179652123823502}
   - component: {fileID: 2133623078610148578}
+  - component: {fileID: 6874095471966977028}
   m_Layer: 0
   m_Name: DungeonHunter
   m_TagString: Untagged
@@ -348,6 +349,22 @@ MonoBehaviour:
   rotationSensitivity: 0.01
   positionPrecision: 0.01
   scalePrecision: 0.01
+--- !u!114 &6874095471966977028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3221069391240029147}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cec413cab0395884ba06763e10b497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hunter
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  hunterCam: {fileID: 4288672907996119538}
 --- !u!1 &4750607524092653994
 GameObject:
   m_ObjectHideFlags: 0
@@ -375,7 +392,7 @@ Transform:
   m_GameObject: {fileID: 4750607524092653994}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.165, z: 0.757}
+  m_LocalPosition: {x: 0, y: 0.89, z: 0.757}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -525,7 +542,7 @@ MonoBehaviour:
   xrRendering: 1
   fullscreenPassthrough: 0
   allowDynamicResolution: 0
-  customRenderingSettings: 0
+  customRenderingSettings: 1
   invertFaceCulling: 0
   probeLayerMask:
     serializedVersion: 2
@@ -552,7 +569,7 @@ MonoBehaviour:
   materialMipBias: 0
   m_RenderingPathCustomFrameSettings:
     bitDatas:
-      data1: 5770166122053581
+      data1: 5770165979414477
       data2: 12934340311651418136
     lodBias: 1
     lodBiasMode: 0
@@ -568,7 +585,7 @@ MonoBehaviour:
     materialQuality: 0
   renderingPathCustomFrameSettingsOverrideMask:
     mask:
-      data1: 0
+      data1: 142639105
       data2: 0
   defaultFrameSettings: 0
 --- !u!1001 &3698673348299902554

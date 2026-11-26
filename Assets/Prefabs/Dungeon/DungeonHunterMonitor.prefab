@@ -27,8 +27,8 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1762399228091516036}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.172}
-  m_LocalScale: {x: 0.0004202001, y: 0.0004202001, z: 0.0004202001}
+  m_LocalPosition: {x: 0, y: 0, z: 0.109}
+  m_LocalScale: {x: 0.00027163833, y: 0.00027163833, z: 0.00027163833}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4646837667967288006}
@@ -116,7 +116,7 @@ GameObject:
   - component: {fileID: 6719195240928365552}
   - component: {fileID: 7053723869574977753}
   m_Layer: 5
-  m_Name: HunterCamera
+  m_Name: LIVE_HunterFootage
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -315,6 +315,7 @@ MonoBehaviour:
   monitorMeshes:
   - {fileID: 2537774845318322225}
   - {fileID: 1762399228091516036}
+  hunterFeed: {fileID: 7053723869574977753}
 --- !u!1001 &3456113691329815904
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -325,15 +326,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 2d3f8d177e2db1f4abe7eaea57c38df2, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.6207006
+      value: 0.40125188
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2d3f8d177e2db1f4abe7eaea57c38df2, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.6207006
+      value: 0.40125188
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2d3f8d177e2db1f4abe7eaea57c38df2, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.6207006
+      value: 0.40125188
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2d3f8d177e2db1f4abe7eaea57c38df2, type: 3}
       propertyPath: m_LocalPosition.x

@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using Mirror;
 using System.Collections;
 using System.Collections.Generic;
@@ -55,6 +56,22 @@ public struct PlayerDungeonHunter
     public Quaternion hunterSpawnROT;
 }
 
+[System.Serializable]
+public struct PlayerDungeonVictim
+{
+    public Vector3 victimSpawnPOS;
+    public Quaternion victimSpawnROT;
+}
+
+[System.Serializable]
+public struct EntirePlayerState
+{
+    public PlayerState playerState;
+    public PlayerTabletopTurn playerTabletopTurn;
+    public PlayerDungeonHunter playerDungeonHunterData;
+    public PlayerDungeonVictim playerDungeonVictimData;
+}
+
 
 public class PlayerGameState : NetworkBehaviour
 {
@@ -78,7 +95,10 @@ public class PlayerGameState : NetworkBehaviour
 
     [Header("Game States")]
     [SyncVar(hook = nameof(OnTableTopSeatInitialized))] public int tabletopSeatIndex = -1;
-    [SyncVar] public PlayerState playerState;
+    [SyncVar(hook = nameof(OnEntirePlayerState))] public EntirePlayerState entirePlayerState;
+
+
+    //[SyncVar] public PlayerState playerState;
     [SyncVar] public bool isAlive;
 
 
@@ -184,7 +204,10 @@ public class PlayerGameState : NetworkBehaviour
     {
         playerStartedInGame = true;
 
-        playerState = PlayerState.Tabletop;
+        EntirePlayerState temp_EPS = entirePlayerState;
+        temp_EPS.playerState = PlayerState.Tabletop;
+        entirePlayerState = temp_EPS;
+
         currentBloodAmount = maxBloodSacrifices;
 
         isAlive = true;
@@ -203,7 +226,10 @@ public class PlayerGameState : NetworkBehaviour
     private void RpcOnPlayerGameStarted()
     {
         playerStartedInGame = true;
-        playerState = PlayerState.Tabletop;
+
+        EntirePlayerState temp_EPS = entirePlayerState;
+        temp_EPS.playerState = PlayerState.Tabletop;
+        entirePlayerState = temp_EPS;
 
         flashLight.enabled = false;
 
@@ -219,35 +245,54 @@ public class PlayerGameState : NetworkBehaviour
     [Server]
     public void ServerEndPlayerTurn()
     {
-        PlayerTabletopTurn temp = new PlayerTabletopTurn();
-        playerTabletopTurn = temp;
+        EntirePlayerState temp_EPS = entirePlayerState;
+        temp_EPS.playerTabletopTurn = new PlayerTabletopTurn();
+        entirePlayerState = temp_EPS;
     }
 
     [Server]
     public void ServerStartPlayerTurn()
     {
-        PlayerTabletopTurn temp = new PlayerTabletopTurn();
-        temp.inTurn = true;
+        EntirePlayerState temp_EPS = entirePlayerState;
+        temp_EPS.playerTabletopTurn = new PlayerTabletopTurn();
+        temp_EPS.playerTabletopTurn.inTurn = true;
 
         if (GameManager.Instance.cursedBoxStation.playerMustForceDraw || GameManager.Instance.cursedBoxStation.everyoneMustForceDraw) 
         {
             // Make animation transition later
-            temp.playerTabletopState = PlayerTabletopState.Cursedbox;
+            temp_EPS.playerTabletopTurn.playerTabletopState = PlayerTabletopState.Cursedbox;
         }
         else
         {
-            temp.playerTabletopState = PlayerTabletopState.Itembox;
+            temp_EPS.playerTabletopTurn.playerTabletopState = PlayerTabletopState.Itembox;
         }
 
-        playerTabletopTurn = temp;
+        entirePlayerState = temp_EPS;
     }
 
     #endregion
 
 
+    private void OnEntirePlayerState(EntirePlayerState oldValue, EntirePlayerState newValue)
+    {
+        if (newValue.playerState == PlayerState.Tabletop && !oldValue.Equals(newValue.playerState))
+        {
+            OnTabletopTurn(oldValue.playerTabletopTurn, newValue.playerTabletopTurn);
+        }
+        else if (newValue.playerState == PlayerState.DungeonHunter && !oldValue.Equals(newValue.playerState))
+        {
+            OnDungeonHunter(oldValue.playerDungeonHunterData, newValue.playerDungeonHunterData);
+        }
+        else if (newValue.playerState == PlayerState.DungeonVictim && !oldValue.Equals(newValue.playerState))
+        {
+            OnDungeonVictim(oldValue.playerDungeonVictimData, newValue.playerDungeonVictimData);
+        }
+    }
+
+
     #region Tabletop Gameplay
     [Header("Tabletop Gameplay")]
-    [SyncVar(hook = nameof(OnTabletopTurn))] public PlayerTabletopTurn playerTabletopTurn;
+    //[SyncVar(hook = nameof(OnTabletopTurn))] public PlayerTabletopTurn playerTabletopTurn;
 
     public int tabletopLives = 4;
     [SyncVar(hook = nameof(OnTabletopLivesChanged))] public int currentTabletopLives;
@@ -261,13 +306,11 @@ public class PlayerGameState : NetworkBehaviour
     public readonly SyncList<string> cursedBoxItemsList = new SyncList<string>();
 
 
-    private void OnTabletopTurn(PlayerTabletopTurn oldValue, PlayerTabletopTurn newValue)
+    private void OnTabletopTurn(PlayerTabletopTurn OLD_playerTabletopTurn, PlayerTabletopTurn playerTabletopTurn)
     {
-        PlayerTabletopTurn tabletopTurn = newValue;
-
         if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
         {
-            playerController.OnPlayerTabletopTurn(tabletopTurn);
+            playerController.OnPlayerTabletopTurn(playerTabletopTurn);
         }
 
 
@@ -448,11 +491,9 @@ public class PlayerGameState : NetworkBehaviour
     [Command]
     public void CmdFinishedWithItemBox()
     {
-        PlayerTabletopTurn temp = new PlayerTabletopTurn();
-        temp.inTurn = true;
-        temp.playerTabletopState = PlayerTabletopState.Cursedbox;
-
-        playerTabletopTurn = temp;
+        EntirePlayerState temp_EPS = entirePlayerState;
+        temp_EPS.playerTabletopTurn.playerTabletopState = PlayerTabletopState.Cursedbox;
+        entirePlayerState = temp_EPS;
     }
 
     #endregion
@@ -484,6 +525,8 @@ public class PlayerGameState : NetworkBehaviour
 
 
     #region Dungeon Gameplay
+    [Header("Dungeon Gameplay")]
+    public bool hasDungeonGameplayStarted;
 
 
     #region Dungeon Victim Gameplay
@@ -501,23 +544,25 @@ public class PlayerGameState : NetworkBehaviour
     [Server]
     public void ServerSpawnVictimInDungeon(Vector3 spawnPosition, Quaternion spawnRotation)
     {
-        playerState = PlayerState.DungeonVictim;
-        RpcSpawnVictimInDungeon(spawnPosition, spawnRotation);
+        EntirePlayerState temp_EPS = entirePlayerState;
+        temp_EPS.playerState = PlayerState.DungeonVictim;
+        temp_EPS.playerDungeonVictimData.victimSpawnPOS = spawnPosition;
+        temp_EPS.playerDungeonVictimData.victimSpawnROT = spawnRotation;
+        entirePlayerState = temp_EPS;
     }
-    [ClientRpc]
-    private void RpcSpawnVictimInDungeon(Vector3 spawnPosition, Quaternion spawnRotation)
+
+    private void OnDungeonVictim(PlayerDungeonVictim OLD_dungeonVictimData, PlayerDungeonVictim dungeonVictimData)
     {
         // Dungeon Victim Ready
 
-        transform.position = spawnPosition;
-        transform.rotation = spawnRotation;
+        transform.position = dungeonVictimData.victimSpawnPOS;
+        transform.rotation = dungeonVictimData.victimSpawnROT;
 
-        playerState = PlayerState.DungeonVictim;
         flashLight.enabled = true;
         
         if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
         {
-            playerController.OnDungeonVictimStarted();
+            playerController.OnDungeonVictimInitialized();
             CmdReportVictimReadyInDungeon();
         }
         else if (playerType == PlayerType.AIControlled && NetworkServer.active)
@@ -525,6 +570,20 @@ public class PlayerGameState : NetworkBehaviour
             ServerReportVictimReadyInDungeon();
         }
     }
+
+    [ClientRpc]
+    public void RpcDungeonVictimGameplayStarted()
+    {
+        hasDungeonGameplayStarted = true;
+
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            playerController.OnDungeonVictimGameplayStarted();
+        }
+    }
+
+
+
     [Command]
     private void CmdReportVictimReadyInDungeon()
     {
@@ -537,8 +596,6 @@ public class PlayerGameState : NetworkBehaviour
         isDungeonVictimReady = true;
         GameManager.Instance.ServerDeployHuntersIntoDungeon();
     }
-
-
 
     // Gap Traversal
 
@@ -614,27 +671,37 @@ public class PlayerGameState : NetworkBehaviour
 
     [Header("Dungeon Hunter Gameplay")]
     public bool isDungeonHunterReady;
-    [SyncVar(hook = nameof(OnPlayerDungeonHunterChanged))] public PlayerDungeonHunter playerDungeonHunter; 
 
     [Server]
     public void ServerSpawnHunterInDungeon(PlayerDungeonHunter dungeonHunterData)
     {
-        playerState = PlayerState.DungeonHunter;
-        playerDungeonHunter = dungeonHunterData;
+        EntirePlayerState temp_EPS = entirePlayerState;
+        temp_EPS.playerState = PlayerState.DungeonHunter;
+        temp_EPS.playerDungeonHunterData = dungeonHunterData;
+        entirePlayerState = temp_EPS;
 
-        RpcSpawnHunterInDungeon(dungeonHunterData);
+        if (isOwned)
+        {
+            dungeonHunterData.dungeonHunter.AssignClientAuthority(connectionToClient);
+        }
     }
-    [ClientRpc]
-    public void RpcSpawnHunterInDungeon(PlayerDungeonHunter dungeonHunterData)
+
+    private void OnDungeonHunter(PlayerDungeonHunter OLD_dungeonHunterData, PlayerDungeonHunter dungeonHunterData)
     {
-        playerState = PlayerState.DungeonHunter;
-        playerDungeonHunter = dungeonHunterData;
-        
         HunterMonitor hunterMonitor = dungeonHunterData.dungeonHunterMonitor.GetComponent<HunterMonitor>();
         hunterMonitor.ShouldShowMonitor(true);
 
+        NetworkIdentity hunterOBJ = dungeonHunterData.dungeonHunter;
+        hunterOBJ.transform.position = dungeonHunterData.hunterSpawnPOS;
+        hunterOBJ.transform.rotation = dungeonHunterData.hunterSpawnROT;
+
+        Hunter hunter = hunterOBJ.GetComponent<Hunter>();
+        hunter.ShouldShowHunterCam(true);
+
         if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
         {
+            hunterMonitor.DisplayHunterFeed(hunter.GetHunterFootageRef());
+            playerController.OnDungeonHunterInitialized();
             CmdReportHunterReadyInDungeon();
         }
         else if (playerType == PlayerType.AIControlled && NetworkServer.active)
@@ -642,6 +709,18 @@ public class PlayerGameState : NetworkBehaviour
             ServerReportHunterReadyInDungeon();
         }
     }
+
+    [ClientRpc]
+    public void RpcDungeonHunterGameplayStarted()
+    {
+        hasDungeonGameplayStarted = true;
+
+        if (playerType == PlayerType.PlayerControlled && isLocalPlayer)
+        {
+            playerController.OnDungeonHunterGameplayStarted();
+        }
+    }
+
 
     [Command]
     private void CmdReportHunterReadyInDungeon()
@@ -656,10 +735,7 @@ public class PlayerGameState : NetworkBehaviour
         GameManager.Instance.ServerCheckAllDungeonPlayersSetUp();
     }
 
-    private void OnPlayerDungeonHunterChanged(PlayerDungeonHunter oldValue, PlayerDungeonHunter newValue)
-    {
-        
-    }
+
 
     #endregion
 

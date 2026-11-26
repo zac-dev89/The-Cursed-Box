@@ -51,15 +51,15 @@ public class PlayerController : NetworkBehaviour
         InteractionChecking();
         CursorInteractionChecking();
 
-        if (playerGameState.playerState == PlayerState.Tabletop)
+        if (playerGameState.entirePlayerState.playerState == PlayerState.Tabletop)
         {
             TabletopGameplay();
         }
-        else if (playerGameState.playerState == PlayerState.DungeonHunter && GameManager.Instance.allDungeonPlayersReady)
+        else if (playerGameState.entirePlayerState.playerState == PlayerState.DungeonHunter && playerGameState.hasDungeonGameplayStarted && GameManager.Instance.allDungeonPlayersReady)
         {
             DungeonHunterGameplay();
         }
-        else if (playerGameState.playerState == PlayerState.DungeonVictim && GameManager.Instance.allDungeonPlayersReady)
+        else if (playerGameState.entirePlayerState.playerState == PlayerState.DungeonVictim && playerGameState.hasDungeonGameplayStarted && GameManager.Instance.allDungeonPlayersReady)
         {
             DungeonVictimGameplay();
         }
@@ -217,8 +217,6 @@ public class PlayerController : NetworkBehaviour
 
     public void OnPlayerTabletopTurn(PlayerTabletopTurn tabletopTurn)
     {
-        if (playerGameState.playerState == PlayerState.DungeonVictim || playerGameState.playerState == PlayerState.DungeonHunter) return;
-
         PlayerTabletopState tabletopState = tabletopTurn.playerTabletopState;
 
         if (tabletopState == PlayerTabletopState.Itembox)
@@ -272,6 +270,7 @@ public class PlayerController : NetworkBehaviour
         }
         else
         {
+            // Stops camera rotation initially
             ExitFocus(.5f);
             gameplayUIHandler.ToggleNonTabletopTurnPanel();
 
@@ -283,13 +282,13 @@ public class PlayerController : NetworkBehaviour
 
     private void TabletopGameplay()
     {
-        if (playerGameState.playerTabletopTurn.inTurn)
+        if (playerGameState.entirePlayerState.playerTabletopTurn.inTurn)
         {
-            if (playerGameState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox)
+            if (playerGameState.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox)
             {
                 TabletopItemBoxGameplay();
             }
-            else if (playerGameState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox)
+            else if (playerGameState.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox)
             {
                 CursedBoxGameplay();
             }
@@ -323,7 +322,7 @@ public class PlayerController : NetworkBehaviour
     }
     private void TryExitBloodPackMode()
     {
-        PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
+        PlayerTabletopTurn playerTabletopTurn = playerGameState.entirePlayerState.playerTabletopTurn;
 
         if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemBoxInsertMode && !playerTabletopTurn.hasUsedItemBoxItem && !playerTabletopTurn.inInteractionCooldown)
         {
@@ -334,7 +333,7 @@ public class PlayerController : NetworkBehaviour
     [Command]
     private void CmdTryExitBloodPackMode()
     {
-        PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
+        PlayerTabletopTurn playerTabletopTurn = playerGameState.entirePlayerState.playerTabletopTurn;
 
         if (playerTabletopTurn.inTurn && playerTabletopTurn.inItemBoxInsertMode && !playerTabletopTurn.hasUsedItemBoxItem && !playerTabletopTurn.inInteractionCooldown)
         {
@@ -360,7 +359,7 @@ public class PlayerController : NetworkBehaviour
 
     private void TryExitItemCardMode()
     {
-        PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
+        PlayerTabletopTurn playerTabletopTurn = playerGameState.entirePlayerState.playerTabletopTurn;
 
         if (playerTabletopTurn.inTurn && playerTabletopTurn.inCursedBoxInsertMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.cursedBoxItemsCap && !playerTabletopTurn.inInteractionCooldown)
         {
@@ -371,7 +370,7 @@ public class PlayerController : NetworkBehaviour
     [Command]
     private void CmdTryExitItemCardMode()
     {
-        PlayerTabletopTurn playerTabletopTurn = playerGameState.playerTabletopTurn;
+        PlayerTabletopTurn playerTabletopTurn = playerGameState.entirePlayerState.playerTabletopTurn;
 
         if (playerTabletopTurn.inTurn && playerTabletopTurn.inCursedBoxInsertMode && playerTabletopTurn.insertedItems < GameManager.Instance.cursedBoxStation.cursedBoxItemsCap && !playerTabletopTurn.inInteractionCooldown)
         {
@@ -426,7 +425,7 @@ public class PlayerController : NetworkBehaviour
 
 
     #region Dungeon Victim Gameplay
-    [Header("Dungeon Victim Movement")]
+    [Header("Dungeon Victim")]
     public float dungeonVictimFOV = 70f;
     public float dungeonVictimFocusFOV = 50f;
     public float dungeonVictimCameraTiltAngle = 4f;
@@ -447,17 +446,26 @@ public class PlayerController : NetworkBehaviour
     public Vector3 dungeonVictimVelocity;
 
 
-    public void OnDungeonVictimStarted()
+    public void OnDungeonVictimInitialized()
     {
-        dungeonVictimMoveSpeed = dungeonVictimWalkSpeed;
-        characterController.enabled = true;
-
         if (focusingCorutine != null) StopCoroutine(focusingCorutine);
         LerpCameraRotation(Quaternion.Euler(0,0,0), dungeonVictimFOV, .5f);
 
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
+
+    public void OnDungeonVictimGameplayStarted()
+    {
+        gameplayUIHandler.ToggleDungeonVictimPanel();
+
+        gameplayUIHandler.UpdateDungeonVictimObjective("OBJECTIVE: SURVIVE HUNTERS");
+        gameplayUIHandler.UpdateDungeonVictimObjectiveTimer(GameManager.Instance.victimDungeonSurvivalTime);
+
+        dungeonVictimMoveSpeed = dungeonVictimWalkSpeed;
+        characterController.enabled = true;
+    }
+
 
     private void DungeonVictimGameplay()
     {
@@ -467,10 +475,8 @@ public class PlayerController : NetworkBehaviour
         DungeonVictimMovementSpeed();
         DungeonVictimMovement();
         DungeonVictimInteraction();
-
-
-
     }
+
     private void DungeonVictimLooking()
     {
         float mouseX = Input.GetAxis("Mouse X");
@@ -610,9 +616,26 @@ public class PlayerController : NetworkBehaviour
 
 
     #region Dungeon Hunter Gameplay
+    [Header("Dungeon Hunter")]
+    private NetworkIdentity curr_hunter;
+
+    public void OnDungeonHunterInitialized()
+    {
+        curr_hunter = playerGameState.entirePlayerState.playerDungeonHunterData.dungeonHunter;
+        FocusAtPoint(playerGameState.entirePlayerState.playerDungeonHunterData.dungeonHunterMonitor.transform, 30f, .5f);
+    }
+    public void OnDungeonHunterGameplayStarted()
+    {
+        gameplayUIHandler.ToggleDungeonHunterPanel();
+    }
+
+
     private void DungeonHunterGameplay()
     {
+        if (curr_hunter == null) return;
+        if (!curr_hunter.isOwned) return;
 
+        
     }
     #endregion
 }

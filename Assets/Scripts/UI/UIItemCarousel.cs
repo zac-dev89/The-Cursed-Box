@@ -47,7 +47,7 @@ public class UIItemCarousel : NetworkBehaviour
         if (!isLocalPlayer) return;
         
         // Item Box Carousel
-        if (PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox && PGS.playerTabletopTurn.inItemBoxInsertMode)
+        if (PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox && PGS.entirePlayerState.playerTabletopTurn.inItemBoxInsertMode)
         {
             if (Input.GetKeyDown(Controls.selectLeftItem))
             {
@@ -60,7 +60,7 @@ public class UIItemCarousel : NetworkBehaviour
         }
 
         // Cursed Box Carousel
-        else if (PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox && PGS.playerTabletopTurn.inCursedBoxInsertMode)
+        else if (PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox && PGS.entirePlayerState.playerTabletopTurn.inCursedBoxInsertMode)
         {
             if (Input.GetKeyDown(Controls.selectLeftItem))
             {

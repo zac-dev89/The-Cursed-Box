@@ -28,15 +28,15 @@ public class AIController : NetworkBehaviour
         if (!AIControllerEnabled) return;
         if (!playerGameState.playerStartedInGame) return;
 
-        if (playerGameState.playerState == PlayerState.Tabletop)
+        if (playerGameState.entirePlayerState.playerState == PlayerState.Tabletop)
         {
             ServerTabletopGameplay();
         }
-        else if (playerGameState.playerState == PlayerState.DungeonHunter)
+        else if (playerGameState.entirePlayerState.playerState == PlayerState.DungeonHunter)
         {
             ServerDungeonHunterGameplay();
         }
-        else if (playerGameState.playerState == PlayerState.DungeonVictim)
+        else if (playerGameState.entirePlayerState.playerState == PlayerState.DungeonVictim)
         {
             ServerDungeonVictimGameplay();
         }
@@ -46,7 +46,7 @@ public class AIController : NetworkBehaviour
     [Server]
     private void ServerTabletopGameplay()
     {
-        if (!playerGameState.playerTabletopTurn.inTurn) return;
+        if (!playerGameState.entirePlayerState.playerTabletopTurn.inTurn) return;
 
         elapsedActionTimer += Time.deltaTime;
 
@@ -60,7 +60,7 @@ public class AIController : NetworkBehaviour
     [Server]
     private void ServerTableTopGameplayAction()
     {
-        if (playerGameState.playerTabletopTurn.finishedCursedBoxDraw) return;
+        if (playerGameState.entirePlayerState.playerTabletopTurn.finishedCursedBoxDraw) return;
 
         GameManager.Instance.cursedBoxStation.ServerDrawCursedCard(netIdentity);
     }

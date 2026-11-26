@@ -256,10 +256,10 @@ public class CursedBoxStation : Interactable
         interactResult.interactType = "";
 
         if (hitObject == gambleForItemTrigger &&
-            PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox &&
-            !PGS.playerTabletopTurn.hasGambledForItem &&
-            !PGS.playerTabletopTurn.hasUsedItemBoxItem &&
-            !PGS.playerTabletopTurn.inInteractionCooldown &&
+            PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox &&
+            !PGS.entirePlayerState.playerTabletopTurn.hasGambledForItem &&
+            !PGS.entirePlayerState.playerTabletopTurn.hasUsedItemBoxItem &&
+            !PGS.entirePlayerState.playerTabletopTurn.inInteractionCooldown &&
             !playerMustForceDraw &&
             !everyoneMustForceDraw &&
             PGS.currentBloodAmount > 0)
@@ -269,36 +269,36 @@ public class CursedBoxStation : Interactable
         }
 
         else if (hitObject == insertItemBoxItemTrigger &&
-            PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox &&
-            !PGS.playerTabletopTurn.hasGambledForItem &&
-            !PGS.playerTabletopTurn.hasUsedItemBoxItem &&
-            !PGS.playerTabletopTurn.inInteractionCooldown &&
+            PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox &&
+            !PGS.entirePlayerState.playerTabletopTurn.hasGambledForItem &&
+            !PGS.entirePlayerState.playerTabletopTurn.hasUsedItemBoxItem &&
+            !PGS.entirePlayerState.playerTabletopTurn.inInteractionCooldown &&
             !playerMustForceDraw &&
             !everyoneMustForceDraw &&
-            !PGS.playerTabletopTurn.inItemBoxInsertMode)
+            !PGS.entirePlayerState.playerTabletopTurn.inItemBoxInsertMode)
         {
             interactResult.canInteract = true;
             interactResult.interactType = "AddBloodPackForItem";
         }
 
         else if (hitObject == insertCursedBoxItemTrigger &&
-            PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox &&
-            !PGS.playerTabletopTurn.finishedCursedBoxDraw &&
-            PGS.playerTabletopTurn.insertedItems < cursedBoxItemsCap &&
-            !PGS.playerTabletopTurn.inInteractionCooldown &&
+            PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox &&
+            !PGS.entirePlayerState.playerTabletopTurn.finishedCursedBoxDraw &&
+            PGS.entirePlayerState.playerTabletopTurn.insertedItems < cursedBoxItemsCap &&
+            !PGS.entirePlayerState.playerTabletopTurn.inInteractionCooldown &&
             !playerMustForceDraw &&
             !everyoneMustForceDraw &&
-            !PGS.playerTabletopTurn.inCursedBoxInsertMode)
+            !PGS.entirePlayerState.playerTabletopTurn.inCursedBoxInsertMode)
         {
             interactResult.canInteract = true;
             interactResult.interactType = "InsertItemCard";
         }
 
         else if (hitObject == drawCursedBoxCardTrigger &&
-            PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox &&
-            !PGS.playerTabletopTurn.finishedCursedBoxDraw &&
-            !PGS.playerTabletopTurn.inInteractionCooldown &&
-            !PGS.playerTabletopTurn.inCursedBoxInsertMode)
+            PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox &&
+            !PGS.entirePlayerState.playerTabletopTurn.finishedCursedBoxDraw &&
+            !PGS.entirePlayerState.playerTabletopTurn.inInteractionCooldown &&
+            !PGS.entirePlayerState.playerTabletopTurn.inCursedBoxInsertMode)
         {
             interactResult.canInteract = true;
             interactResult.interactType = "DrawCursedCard";
@@ -344,15 +344,15 @@ public class CursedBoxStation : Interactable
         ItemInformation itemInfo = ItemData.Instance.GetItemInfoFromName(itemName);
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        if (PGS.playerTabletopTurn.inInteractionCooldown) return false;
+        if (PGS.entirePlayerState.playerTabletopTurn.inInteractionCooldown) return false;
 
         bool canInsert = false;
 
-        if (itemInfo.isCursedBoxItem && PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox)
+        if (itemInfo.isCursedBoxItem && PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox)
         {
             canInsert = CanInsertCursedBoxItem(playerRef, itemName);
         }
-        else if (itemInfo.isItemBoxItem && PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox)
+        else if (itemInfo.isItemBoxItem && PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox)
         {
             canInsert = CanInsertItemBoxItem(playerRef, itemName);
         }
@@ -366,11 +366,11 @@ public class CursedBoxStation : Interactable
         ItemInformation itemInfo = ItemData.Instance.GetItemInfoFromName(itemName);
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        if (CanInsertCursedBoxItem(playerRef, itemName) && itemInfo.isCursedBoxItem && PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox)
+        if (CanInsertCursedBoxItem(playerRef, itemName) && itemInfo.isCursedBoxItem && PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Cursedbox)
         {
             ServerInsertCursedBoxItem(playerRef, itemName);
         }
-        else if (CanInsertItemBoxItem(playerRef, itemName) && itemInfo.isItemBoxItem && PGS.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox)
+        else if (CanInsertItemBoxItem(playerRef, itemName) && itemInfo.isItemBoxItem && PGS.entirePlayerState.playerTabletopTurn.playerTabletopState == PlayerTabletopState.Itembox)
         {
             ServerInsertItemBoxItem(playerRef, itemName);
         }
@@ -383,13 +383,13 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.hasGambledForItem = true;
-        tempTabletopTurn.playerTabletopState = PlayerTabletopState.Cursedbox;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.hasGambledForItem = true;
+        temp_EPS.playerTabletopTurn.playerTabletopState = PlayerTabletopState.Cursedbox;
 
         GetRandomItems(playerRef);
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
         PGS.currentBloodAmount--;
     }
 
@@ -398,10 +398,10 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.inItemBoxInsertMode = true;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.inItemBoxInsertMode = true;
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
     }
 
     [Server]
@@ -409,10 +409,10 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.inItemBoxInsertMode = false;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.inItemBoxInsertMode = false;
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
     }
 
     [Server]
@@ -420,13 +420,13 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.hasUsedItemBoxItem = true;
-        tempTabletopTurn.playerTabletopState = PlayerTabletopState.Cursedbox;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.hasUsedItemBoxItem = true;
+        temp_EPS.playerTabletopTurn.playerTabletopState = PlayerTabletopState.Cursedbox;
 
         GetRandomItems(playerRef);
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
         PGS.ServerRemoveItemBoxItem("BloodPack");
 
         ServerExitBloodPackMode(playerRef);
@@ -450,7 +450,7 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        if (PGS.playerTabletopTurn.hasUsedItemBoxItem) return false;
+        if (PGS.entirePlayerState.playerTabletopTurn.hasUsedItemBoxItem) return false;
 
         bool canInsert = false;
 
@@ -501,10 +501,10 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.inCursedBoxInsertMode = true;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.inCursedBoxInsertMode = true;
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
     }
 
     [Server]
@@ -512,10 +512,10 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.inCursedBoxInsertMode = false;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.inCursedBoxInsertMode = false;
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
     }
 
     public bool CanInsertCursedBoxItem(NetworkIdentity playerRef, string itemName)
@@ -528,7 +528,7 @@ public class CursedBoxStation : Interactable
 
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        if (PGS.playerTabletopTurn.insertedItems >= cursedBoxItemsCap) return false;
+        if (PGS.entirePlayerState.playerTabletopTurn.insertedItems >= cursedBoxItemsCap) return false;
 
         bool canInsertItem = false;
 
@@ -637,10 +637,10 @@ public class CursedBoxStation : Interactable
 
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.insertedItems++;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.insertedItems++;
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
         PGS.ServerRemoveItem(itemName);
 
 
@@ -651,7 +651,7 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
 
         if (skipTurnItemInserted)
         {
@@ -660,22 +660,22 @@ public class CursedBoxStation : Interactable
             return;
         }
 
-        tempTabletopTurn.cursedBoxDrawCounter++;
+        temp_EPS.playerTabletopTurn.cursedBoxDrawCounter++;
+        PGS.entirePlayerState = temp_EPS;
         //Debug.Log($"Player drew {tempTabletopTurn.cursedBoxDrawCounter} times. He must draw {(playerMustDrawTwice ? 2 : 1)} times");
 
-        if (tempTabletopTurn.cursedBoxDrawCounter == 1 && !playerMustDrawTwice)
+        if (temp_EPS.playerTabletopTurn.cursedBoxDrawCounter == 1 && !playerMustDrawTwice)
         {
-            tempTabletopTurn.finishedCursedBoxDraw = true;
+            temp_EPS.playerTabletopTurn.finishedCursedBoxDraw = true;
         }
-        else if (tempTabletopTurn.cursedBoxDrawCounter == 2 && playerMustDrawTwice)
+        else if (temp_EPS.playerTabletopTurn.cursedBoxDrawCounter == 2 && playerMustDrawTwice)
         {
-            tempTabletopTurn.finishedCursedBoxDraw = true;
+            temp_EPS.playerTabletopTurn.finishedCursedBoxDraw = true;
             playerMustDrawTwice = false;
         }
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
 
-        if ((playerMustForceDraw || everyoneMustForceDraw) && tempTabletopTurn.finishedCursedBoxDraw)
+        if ((playerMustForceDraw || everyoneMustForceDraw) && temp_EPS.playerTabletopTurn.finishedCursedBoxDraw)
         {
             playerForceDrawCount++;
             Debug.Log($"Force Draw Count: {playerForceDrawCount}");
@@ -687,10 +687,11 @@ public class CursedBoxStation : Interactable
             int livesToDeduct = takeTwoLivesItemInserted ? 2 : 1;
             PGS.ServerRetrieveDeathCard(livesToDeduct);
         }
-        else if (tempTabletopTurn.finishedCursedBoxDraw)
+        else if (temp_EPS.playerTabletopTurn.finishedCursedBoxDraw)
         {
             GameManager.Instance.ServerStartSwitchPlayerTurn();
         }
+
     }
 
 
@@ -793,11 +794,11 @@ public class CursedBoxStation : Interactable
         Debug.Log("PeekInside");
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.inInteractionCooldown = true;
-        tempTabletopTurn.peekingAtBox = true;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.inInteractionCooldown = true;
+        temp_EPS.playerTabletopTurn.peekingAtBox = true;
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
 
         RpcShouldDisplayPeekInsideVisuals(true);
     }
@@ -806,11 +807,11 @@ public class CursedBoxStation : Interactable
     {
         PlayerGameState PGS = playerRef.GetComponent<PlayerGameState>();
 
-        PlayerTabletopTurn tempTabletopTurn = PGS.playerTabletopTurn;
-        tempTabletopTurn.inInteractionCooldown = false;
-        tempTabletopTurn.peekingAtBox = false;
+        EntirePlayerState temp_EPS = PGS.entirePlayerState;
+        temp_EPS.playerTabletopTurn.inInteractionCooldown = false;
+        temp_EPS.playerTabletopTurn.peekingAtBox = false;
 
-        PGS.playerTabletopTurn = tempTabletopTurn;
+        PGS.entirePlayerState = temp_EPS;
 
         RpcShouldDisplayPeekInsideVisuals(false);
     }

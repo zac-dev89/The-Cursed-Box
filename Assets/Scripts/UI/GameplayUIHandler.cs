@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using Mirror;
 using TMPro;
 using System.Linq;
+using System;
 
 
 public class GameplayUIHandler : NetworkBehaviour
@@ -18,7 +19,8 @@ public class GameplayUIHandler : NetworkBehaviour
     [Header("Gameplay Panels")]
     public GameObject waitingPanel;
     public GameObject tabletopPanel;
-    public GameObject dungeonPanel;
+    public GameObject dungeonVictimPanel;
+    public GameObject dungeonHunterPanel;
     public List<GameObject> gameplayUI = new List<GameObject>();
 
 
@@ -49,6 +51,10 @@ public class GameplayUIHandler : NetworkBehaviour
     public Texture2D interactHand;
     private Texture2D currentHandCursor;
     private bool isCursorOnInteractableButton;
+
+    [Header("Dungeon Victim UI")]
+    public TextMeshProUGUI dungeonVictimObjectiveText;
+    public TextMeshProUGUI dungeonVictimObjectiveTimer;
 
     public void Start()
     {
@@ -81,11 +87,14 @@ public class GameplayUIHandler : NetworkBehaviour
     {
         TogglePanel(tabletopPanel, gameplayUI);
     }
-    public void ToggleDungeonPanel()
+    public void ToggleDungeonVictimPanel()
     {
-        TogglePanel(dungeonPanel, gameplayUI);
+        TogglePanel(dungeonVictimPanel, gameplayUI);
     }
-
+    public void ToggleDungeonHunterPanel()
+    {
+        TogglePanel(dungeonHunterPanel, gameplayUI);
+    }
 
 
     // Tabletop Panels
@@ -153,6 +162,9 @@ public class GameplayUIHandler : NetworkBehaviour
 
     #endregion
 
+
+    #region Tabletop UI
+
     #region Non Turn UI
 
     #endregion
@@ -166,17 +178,15 @@ public class GameplayUIHandler : NetworkBehaviour
     #endregion
 
     #region Cursedbox UI
-
-    #endregion
-
     public void UpdateCursedBoxItemsUI()
     {
         itemCarousel.UpdateCursedBoxUI(playerGameState.cursedBoxItemsList.ToList<string>());
     }
-    public void UpdateItemBoxItemsUI() 
+    public void UpdateItemBoxItemsUI()
     {
         itemCarousel.UpdateItemBoxUI(playerGameState.itemBoxItemsList.ToList<string>());
     }
+    #endregion
 
     #region Cursors
 
@@ -214,5 +224,34 @@ public class GameplayUIHandler : NetworkBehaviour
         Cursor.SetCursor(newCursor, cursorHostpot, CursorMode.Auto);
         currentHandCursor = newCursor;
     }
+    #endregion
+
+    #endregion
+
+
+    #region Dungeon Victim UI
+    public void UpdateDungeonVictimObjective(string objectiveName)
+    {
+        dungeonVictimObjectiveText.text = objectiveName;
+    }
+    public void UpdateDungeonVictimObjectiveTimer(int timeLeft)
+    {
+        TimeSpan time = TimeSpan.FromSeconds(timeLeft);
+
+        string timerText = $"{(int)time.TotalMinutes}:{time.Seconds:D2}";
+        dungeonVictimObjectiveTimer.text = timerText;
+
+        if (timeLeft > 10)
+        {
+            dungeonVictimObjectiveTimer.color = Color.white;
+        }
+        else
+        {
+            dungeonVictimObjectiveTimer.color = Color.red;
+        }
+    }
+
+
+
     #endregion
 }

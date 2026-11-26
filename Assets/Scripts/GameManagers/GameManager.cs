@@ -37,8 +37,8 @@ public class GameManager : NetworkBehaviour
 
     [Space]
 
-    public float victimDungeonSurvivalTime = 30f;
-    [SyncVar(hook = nameof(OnDungeonTimerUpdate))] private float curr_victimDungeonSurvivalTimer;
+    public int victimDungeonSurvivalTime = 30;
+    [SyncVar(hook = nameof(OnDungeonTimerUpdate))] private int curr_victimDungeonSurvivalTimer;
 
 
     private void Awake()
@@ -193,7 +193,6 @@ public class GameManager : NetworkBehaviour
     [Server]
     public void ServerDeployHuntersIntoDungeon()
     {
-        Debug.Log("Hunters Must Be Deployed!");
         int hunterSpawnPTIndex = 1;
         int hunterIndex = 0;
 
@@ -221,42 +220,72 @@ public class GameManager : NetworkBehaviour
     [Server]
     public void ServerCheckAllDungeonPlayersSetUp()
     {
-        Debug.Log("Check Dungeon Hunter Players Ready");
+        if (allDungeonPlayersReady) return;
 
         foreach (NetworkIdentity hunter in PlayerManager.Instance.players)
         {
             PlayerGameState hunterPGS = hunter.GetComponent<PlayerGameState>();
 
-            if (hunterPGS.playerState == PlayerState.DungeonHunter && !hunterPGS.isDungeonHunterReady)
+            if (!hunterPGS.isDungeonVictimReady && !hunterPGS.isDungeonHunterReady)
             {
                 return;
-            }
-            
-
-            allDungeonPlayersReady = true;
-            ServerStartDungeonGameplay();
+            }         
         }
+
+        ServerStartDungeonGameplay();
     }
 
 
     [Server]
     private void ServerStartDungeonGameplay()
     {
+        allDungeonPlayersReady = true;
         curr_victimDungeonSurvivalTimer = victimDungeonSurvivalTime;
-        StartCoroutine(DungeonTimer());
+
+        foreach (NetworkIdentity player in PlayerManager.Instance.players)
+        {
+            PlayerGameState PGS = player.GetComponent<PlayerGameState>();
+
+            if (PGS.entirePlayerState.playerState == PlayerState.DungeonVictim)
+            {
+                PGS.RpcDungeonVictimGameplayStarted();
+            }
+            else if (PGS.entirePlayerState.playerState == PlayerState.DungeonHunter)
+            {
+                PGS.RpcDungeonHunterGameplayStarted();
+            }
+        }
+
+        StartCoroutine(DungeonHuntTimer());
     }
 
-    IEnumerator DungeonTimer()
+    IEnumerator DungeonHuntTimer()
     {
         while (curr_victimDungeonSurvivalTimer > 0)
         {
             yield return new WaitForSeconds(1f);
-            curr_victimDungeonSurvivalTimer = Mathf.Clamp(curr_victimDungeonSurvivalTimer - 1f, 0f, victimDungeonSurvivalTime);
+            curr_victimDungeonSurvivalTimer = Mathf.Clamp(curr_victimDungeonSurvivalTimer - 1, 0, victimDungeonSurvivalTime);
         }
     }
-    private void OnDungeonTimerUpdate(float oldValue, float newValue)
+    private void OnDungeonTimerUpdate(int oldValue, int newValue)
     {
-        Debug.Log($"{curr_victimDungeonSurvivalTimer} seconds left...");
+        //Debug.Log($"{curr_victimDungeonSurvivalTimer} seconds left...");
+        NetworkIdentity temp_player = NetworkClient.localPlayer;
+
+        if (temp_player == null) return;
+
+        temp_player.GetComponent<GameplayUIHandler>().UpdateDungeonVictimObjectiveTimer(newValue);
+    }
+
+    [Server]
+    private void ServerEscapeDungeonGameplay()
+    {
+
+    }
+
+    IEnumerator EscapeDungeonTimer()
+    {
+        yield return null;
     }
 
     #endregion
