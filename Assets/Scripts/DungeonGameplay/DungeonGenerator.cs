@@ -19,7 +19,7 @@ public class DungeonGenerator : NetworkBehaviour
     public GameObject wall_crawlspace;
 
     [Header("Dungeon Generation")]
-    public int seed;
+    [SyncVar(hook = nameof(OnSeedInitialized))] public int seed;
     public bool randomizeSeed = true;
 
     private System.Random mapGen;
@@ -66,16 +66,22 @@ public class DungeonGenerator : NetworkBehaviour
     public override void OnStartServer()
     {
         base.OnStartServer();
-        InitializeSeed();
-        GenerateMap();
+        ServerInitializeSeed();    
     }
 
-    private void InitializeSeed()
+    [Server]
+    private void ServerInitializeSeed()
     {
         if (randomizeSeed)
             seed = Random.Range(1000000, 10000000);
+    }
 
-        mapGen = new System.Random(seed);
+    private void OnSeedInitialized(int oldSeed, int newSeed)
+    {
+        mapGen = new System.Random(newSeed);
+
+        GenerateMap();
+
     }
 
     private void GenerateMap()
@@ -469,35 +475,31 @@ public class DungeonGenerator : NetworkBehaviour
 
     private void SpawnGaps(List<GameObject> wallBranches)
     {
-        int gapsToSpawn = mapGen.Next(minGapsPerBranch, maxGapsPerBranch);
-        gapsToSpawn = gapsToSpawn > wallBranches.Count ? wallBranches.Count : gapsToSpawn;
+        int gapsToSpawn = Mathf.Min(mapGen.Next(minGapsPerBranch, maxGapsPerBranch), wallBranches.Count);
 
         for (int i = 0; i < gapsToSpawn; i++)
         {
-            GameObject temp_wall = wallBranches[mapGen.Next(0, wallBranches.Count)];
-            wallBranches.Remove(temp_wall);
+            int index = mapGen.Next(wallBranches.Count);
+            GameObject replacedWall = wallBranches[index];
+            wallBranches.RemoveAt(index);
 
-            Vector3 newWallPos = temp_wall.transform.position;
-            Quaternion newWallRot = temp_wall.transform.rotation;
+            GameObject gapPrefab =
+                mapGen.Next(0, 2) == 0 ? wall_gap : wall_crawlspace;
 
-            Destroy(temp_wall);
+            Vector3 position = replacedWall.transform.position;
+            Quaternion rotation = replacedWall.transform.rotation;
+            Destroy(replacedWall);
 
-            Debug.Log("TRY SPAWN SERVER GAP");
+            if (isServer)
+                ServerSpawnGap(gapPrefab, position, rotation);
+        }
 
-            if (NetworkServer.active)
-            {
-                Debug.Log("SPAWN SERVER GAP");
-                ServerSpawnGap(newWallPos, newWallRot);
-            }
-        }     
     }
 
     [Server]
-    private void ServerSpawnGap(Vector3 newWallPos, Quaternion newWallRot)
+    private void ServerSpawnGap(GameObject gapPrefab, Vector3 newWallPos, Quaternion newWallRot)
     {
-        GameObject gapToSpawn = mapGen.Next(0, 2) == 0 ? wall_gap : wall_crawlspace;
-
-        GameObject spawnedGap = Instantiate(gapToSpawn, newWallPos, newWallRot);
+        GameObject spawnedGap = Instantiate(gapPrefab, newWallPos, newWallRot);
         NetworkServer.Spawn(spawnedGap);
     }
 

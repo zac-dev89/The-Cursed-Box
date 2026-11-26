@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/DungeonGenerator.unity
+    guid: 46e5e1690408c5f44b1aa82440a16383
+  - enabled: 1
     path: Assets/Scenes/TestingLobby.unity
     guid: 11cadccfe59136c48a69ea625266588a
   - enabled: 1
